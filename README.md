@@ -1,26 +1,68 @@
 # CloudArcade
 
-CloudArcade is a browser-based game library and installable Progressive Web App (PWA). It runs user-provided ROM files with EmulatorJS; it does not include game ROMs.
+CloudArcade is a browser-based game library and installable Progressive Web App (PWA). It runs user-provided ROM files with EmulatorJS; it does not include game ROMs. The production target is Cloudflare Workers, with D1 for account/library data and R2 for ROMs and cover art.
 
-## Run locally
+## Requirements
 
-Requirements: Node.js 20.9 or newer and PostgreSQL.
+- Node.js 22 or newer
+- npm
+- A Cloudflare account only for remote deployment (local development and preview use Wrangler's local services)
 
-1. Install dependencies: `npm install`.
-2. Copy `.env.example` to `.env` and set `DATABASE_URL` to your PostgreSQL database.
-3. Apply the included database migration: `npm run db:migrate`.
-4. Start the development server: `npm run dev` and open <http://localhost:3000>.
+## Local development
 
-When changing the database schema, create and apply a migration with `npm run db:generate` followed by `npm run db:migrate`. `npm run db:push` is also available for local development.
+```bash
+npm ci
+cp .dev.vars.example .dev.vars
+npm run db:migrate:local
+npm run dev
+```
 
-For a production build, run `npm run build` and then `npm run start`. The server must have access to PostgreSQL and a writable, persistent `storage/` directory for uploaded ROMs and covers. A serverless or multi-instance deployment needs shared persistent/object storage; the current implementation writes to local disk.
+Open <http://localhost:3000>. Next.js development mode uses the bindings in `wrangler.jsonc` through OpenNext's local Cloudflare integration. `.dev.vars` is for local values and must not be committed.
+
+To test the built app in the Workers runtime rather than Next's development server:
+
+```bash
+npm run cf:preview
+```
+
+Wrangler starts a local Worker preview (normally at <http://localhost:8787>). The D1 migration must be applied locally first. ROM uploads are stored in Wrangler's local R2 emulation.
+
+## Cloudflare setup and deployment
+
+1. Install dependencies and authenticate with Wrangler:
+   ```bash
+   npm ci
+   npx wrangler login
+   ```
+2. Create the remote database and bucket:
+   ```bash
+   npx wrangler d1 create cloudarcade-db
+   npx wrangler r2 bucket create cloudarcade-roms
+   ```
+3. Copy the D1 `database_id` returned by Wrangler into `wrangler.jsonc`. Keep the D1 binding name `DB` and R2 binding name `ROM_FILES`; if you choose a different bucket name, update `bucket_name` too.
+4. Apply the D1 schema and deploy:
+   ```bash
+   npm run db:migrate:remote
+   npm run cf:deploy
+   ```
+5. Wrangler prints the public `workers.dev` URL. Add a custom domain in Cloudflare if desired. The PWA requires HTTPS, which Cloudflare provides for its Worker URL.
+
+The checked-in D1 ID is intentionally a placeholder, so remote migrations and deployment will fail until it is replaced with the ID from your Cloudflare account. Never commit credentials or `.dev.vars` values. To change the schema, run `npm run db:generate`, review the generated SQL in `drizzle/`, then apply it locally and remotely with the corresponding migration commands.
+
+## Useful checks
+
+```bash
+npm run lint
+npm run typecheck
+npm run cf:build
+```
 
 ## Install on a device
 
-CloudArcade is installed from its website as a PWA, not as an APK or native emulator package. Deploy the app to a public HTTPS address with a valid TLS certificate; `localhost` is also considered secure when testing on the same computer. Keep the PostgreSQL database and uploaded-file storage available to the deployed server.
+CloudArcade is installed from its public HTTPS website as a PWA, not as an APK or native emulator package.
 
-- **Android / Chrome:** open the HTTPS site, then press **Установить приложение**. If the browser does not show a prompt, use Chrome's menu and choose **Установить приложение** or **Добавить на главный экран**.
+- **Android / Chrome:** open the HTTPS site and press **Установить приложение**. If no prompt appears, open Chrome's menu and choose **Установить приложение** or **Добавить на главный экран**.
 - **iPhone / iPad:** open the site in Safari, tap **Поделиться**, then **На экран «Домой»**.
 - **Desktop / Edge:** use the install icon in the address bar or the browser menu's install option.
 
-The app needs an internet connection to authenticate, read ROMs, and load the EmulatorJS runtime from its CDN. The service worker caches the offline information page and icons; it deliberately does not cache private library/API responses or game files.
+The app needs an internet connection to authenticate, read private ROMs, and load the EmulatorJS runtime from its CDN. The service worker caches the offline information page and icons; it deliberately does not cache private library/API responses or game files. Uploads are sent to the Worker in 20 MiB chunks to stay below Cloudflare's per-request body limit; the current app limit is 500 MiB per ROM and 8 MiB per cover.

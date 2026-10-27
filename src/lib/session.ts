@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
-import { eq, and, gt } from "drizzle-orm";
-import { db } from "@/db";
+import { and, eq, gt } from "drizzle-orm";
+import { getDb } from "@/db";
 import { sessions, users } from "@/db/schema";
 
 export const SESSION_COOKIE = "arcade_session";
@@ -13,6 +13,7 @@ export type SessionUser = {
 };
 
 export async function createSessionForUser(userId: string) {
+  const db = await getDb();
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
   const [row] = await db
     .insert(sessions)
@@ -35,6 +36,7 @@ export async function clearSession() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (token) {
+    const db = await getDb();
     await db.delete(sessions).where(eq(sessions.token, token));
   }
   cookieStore.delete(SESSION_COOKIE);
@@ -45,6 +47,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;
 
+  const db = await getDb();
   const rows = await db
     .select({
       id: users.id,

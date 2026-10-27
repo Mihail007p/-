@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { games } from "@/db/schema";
 import { getCurrentUser } from "@/lib/session";
 import type { ClientGame } from "@/lib/types";
@@ -12,6 +12,7 @@ export default async function LibraryPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
+  const db = await getDb();
   const rows = await db
     .select()
     .from(games)

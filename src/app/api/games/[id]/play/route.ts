@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, sql } from "drizzle-orm";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { games } from "@/db/schema";
 import { getCurrentUser } from "@/lib/session";
 
@@ -12,6 +12,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: "Требуется вход" }, { status: 401 });
   }
   const { id } = await params;
+  const db = await getDb();
 
   const [updated] = await db
     .update(games)
