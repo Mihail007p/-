@@ -3,17 +3,13 @@ import { getCurrentUser } from "@/lib/session";
 import {
   getSystem,
   isExtensionAllowed,
+  isValidCoverFilename,
   isValidRomFilename,
   MAX_COVER_SIZE_BYTES,
   MAX_GAME_TITLE_LENGTH,
   MAX_ROM_SIZE_BYTES,
 } from "@/lib/systems";
-import {
-  deleteStoredFile,
-  ROM_PART_SIZE_BYTES,
-  saveUploadedFile,
-  startRomMultipartUpload,
-} from "@/lib/storage";
+import { createCoverBlobPath, createRomBlobPath } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -23,21 +19,18 @@ export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });
 
-  let formData: FormData;
-  try {
-    formData = await request.formData();
-  } catch {
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object") {
     return NextResponse.json({ error: "Некорректный запрос" }, { status: 400 });
   }
 
-  const titleValue = formData.get("title");
-  const systemValue = formData.get("system");
-  const filenameValue = formData.get("romFilename");
-  const sizeValue = formData.get("romSizeBytes");
-  const title = typeof titleValue === "string" ? titleValue.trim() : "";
-  const systemId = typeof systemValue === "string" ? systemValue : "";
-  const romFilename = typeof filenameValue === "string" ? filenameValue : "";
-  const romSizeBytes = typeof sizeValue === "string" ? Number(sizeValue) : NaN;
+  const values = body as Record<string, unknown>;
+  const title = typeof values.title === "string" ? values.title.trim() : "";
+  const systemId = typeof values.system === "string" ? values.system : "";
+  const romFilename = typeof values.romFilename === "string" ? values.romFilename : "";
+  const romSizeBytes = typeof values.romSizeBytes === "number" ? values.romSizeBytes : NaN;
+  const coverFilename = typeof values.coverFilename === "string" ? values.coverFilename : null;
+  const coverSizeBytes = typeof values.coverSizeBytes === "number" ? values.coverSizeBytes : null;
   const system = getSystem(systemId);
 
   if (!title) return NextResponse.json({ error: "Введите название игры" }, { status: 400 });
@@ -45,66 +38,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Название должно быть не длиннее ${MAX_GAME_TITLE_LENGTH} символов` }, { status: 400 });
   }
   if (!system) return NextResponse.json({ error: "Выберите систему" }, { status: 400 });
-  if (!isValidRomFilename(romFilename)) {
-    return NextResponse.json({ error: "Некорректное имя файла ROM" }, { status: 400 });
+  if (!isValidRomFilename(romFilename) || !isExtensionAllowed(romFilename, system)) {
+    return NextResponse.json({ error: "Неподходящее имя или расширение ROM-файла" }, { status: 400 });
   }
-  if (!Number.isSafeInteger(romSizeBytes) || romSizeBytes <= 0) {
-    return NextResponse.json({ error: "Выберите корректный файл ROM" }, { status: 400 });
-  }
-  if (romSizeBytes > MAX_ROM_SIZE_BYTES) {
+  if (!Number.isSafeInteger(romSizeBytes) || romSizeBytes <= 0 || romSizeBytes > MAX_ROM_SIZE_BYTES) {
     return NextResponse.json({ error: "Файл ROM слишком большой (максимум 500 МБ)" }, { status: 400 });
   }
-  if (!isExtensionAllowed(romFilename, system)) {
-    return NextResponse.json(
-      { error: `Неподходящее расширение файла. Разрешены: ${system.extensions.join(", ")}` },
-      { status: 400 },
-    );
-  }
 
-  const coverValue = formData.get("cover");
-  const coverFile = coverValue instanceof File && coverValue.size > 0 ? coverValue : null;
-  if (coverValue && typeof coverValue !== "string" && coverValue.size > MAX_COVER_SIZE_BYTES) {
-    return NextResponse.json({ error: "Обложка слишком большая (максимум 8 МБ)" }, { status: 400 });
+  if ((coverFilename === null) !== (coverSizeBytes === null)) {
+    return NextResponse.json({ error: "Некорректные данные обложки" }, { status: 400 });
   }
-  if (coverFile) {
-    const extension = coverFile.name.split(".").at(-1)?.toLowerCase() ?? "";
-    if (!COVER_EXTENSIONS.has(extension) || (coverFile.type && !coverFile.type.startsWith("image/"))) {
+  if (coverFilename && coverSizeBytes !== null) {
+    const extension = coverFilename.split(".").at(-1)?.toLowerCase() ?? "";
+    if (!isValidCoverFilename(coverFilename) || !COVER_EXTENSIONS.has(extension)) {
       return NextResponse.json({ error: "Поддерживаются обложки PNG, JPG, WEBP или GIF" }, { status: 400 });
+    }
+    if (!Number.isSafeInteger(coverSizeBytes) || coverSizeBytes <= 0 || coverSizeBytes > MAX_COVER_SIZE_BYTES) {
+      return NextResponse.json({ error: "Обложка слишком большая (максимум 8 МБ)" }, { status: 400 });
     }
   }
 
   const gameId = crypto.randomUUID();
-  let coverStoragePath: string | null = null;
-  let coverFilename: string | null = null;
-
-  try {
-    if (coverFile) {
-      const cover = await saveUploadedFile(coverFile, "covers", user.id);
-      coverStoragePath = cover.storagePath;
-      coverFilename = cover.filename;
-    }
-
-    const upload = await startRomMultipartUpload({
-      ownerId: user.id,
+  return NextResponse.json(
+    {
       gameId,
-      system: system.id,
-      filename: romFilename,
-    });
-
-    return NextResponse.json(
-      {
-        gameId,
-        key: upload.key,
-        uploadId: upload.uploadId,
-        partSize: ROM_PART_SIZE_BYTES,
-        coverStoragePath,
-        coverFilename,
-      },
-      { headers: { "Cache-Control": "no-store" } },
-    );
-  } catch (error) {
-    await deleteStoredFile(coverStoragePath);
-    console.error("Unable to start ROM upload", error);
-    return NextResponse.json({ error: "Не удалось начать загрузку игры" }, { status: 500 });
-  }
+      romStoragePath: createRomBlobPath(user.id, gameId, romFilename),
+      coverStoragePath: coverFilename ? createCoverBlobPath(user.id, gameId, coverFilename) : null,
+      romFilename,
+      romSizeBytes,
+      coverFilename,
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }

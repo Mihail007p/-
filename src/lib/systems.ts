@@ -38,6 +38,10 @@ export function isValidRomFilename(filename: string): boolean {
   return filename.length > 0 && filename.length <= MAX_ROM_FILENAME_LENGTH && !/[\\/\u0000-\u001f\u007f]/.test(filename);
 }
 
+export function isValidCoverFilename(filename: string): boolean {
+  return filename.length > 0 && filename.length <= MAX_ROM_FILENAME_LENGTH && !/[\\/\u0000-\u001f\u007f]/.test(filename);
+}
+
 export function isExtensionAllowed(filename: string, system: SystemDef): boolean {
   const lower = filename.toLowerCase();
   return system.extensions.some((ext) => lower.endsWith(ext));

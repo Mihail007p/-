@@ -7,14 +7,6 @@ import { getStoredFile } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
-const CONTENT_TYPES: Record<string, string> = {
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  webp: "image/webp",
-  gif: "image/gif",
-};
-
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) {
@@ -33,15 +25,14 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   }
 
   const object = await getStoredFile(game.coverStoragePath);
-  if (!object) {
+  if (!object || object.statusCode !== 200) {
     return NextResponse.json({ error: "Обложка не найдена" }, { status: 404 });
   }
 
-  const extension = game.coverFilename?.split(".").at(-1)?.toLowerCase() ?? "";
-  return new NextResponse(object.body, {
+  return new NextResponse(object.stream, {
     headers: {
-      "Content-Type": object.httpMetadata?.contentType ?? CONTENT_TYPES[extension] ?? "application/octet-stream",
-      "Content-Length": String(object.size),
+      "Content-Type": object.blob.contentType,
+      "Content-Length": String(object.blob.size),
       "X-Content-Type-Options": "nosniff",
       "Cache-Control": "private, max-age=31536000, immutable",
     },

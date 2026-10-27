@@ -3,12 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { games } from "@/db/schema";
 import { getCurrentUser } from "@/lib/session";
-import {
-  abortRomMultipartUpload,
-  deleteStoredFile,
-  isOwnedCoverStorageKey,
-  isOwnedRomStorageKey,
-} from "@/lib/storage";
+import { deleteStoredFile, isOwnedCoverStoragePath, isOwnedRomStoragePath } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -16,37 +11,31 @@ export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Требуется вход" }, { status: 401 });
 
-  const body = await request.json().catch(() => ({}));
-  const values = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
-  const key = typeof values.key === "string" ? values.key : "";
-  const uploadId = typeof values.uploadId === "string" ? values.uploadId : "";
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "Некорректный запрос" }, { status: 400 });
+  }
+
+  const values = body as Record<string, unknown>;
+  const gameId = typeof values.gameId === "string" ? values.gameId : "";
+  const romStoragePath = typeof values.romStoragePath === "string" ? values.romStoragePath : null;
   const coverStoragePath = typeof values.coverStoragePath === "string" ? values.coverStoragePath : null;
-
-  if (!isOwnedRomStorageKey(key, user.id) || !uploadId || uploadId.length > 256) {
-    return NextResponse.json({ error: "Некорректная загрузка" }, { status: 400 });
+  if (!gameId) return NextResponse.json({ error: "Не указана игра" }, { status: 400 });
+  if (romStoragePath && !isOwnedRomStoragePath(romStoragePath, user.id, gameId)) {
+    return NextResponse.json({ error: "Некорректный путь к ROM" }, { status: 400 });
+  }
+  if (coverStoragePath && !isOwnedCoverStoragePath(coverStoragePath, user.id, gameId)) {
+    return NextResponse.json({ error: "Некорректный путь к обложке" }, { status: 400 });
   }
 
-  let safeToDelete = true;
-  try {
-    await abortRomMultipartUpload(key, uploadId);
-  } catch (error) {
-    // If completion committed before the client lost its response, keep the game's R2 object.
-    const db = await getDb();
-    const rows = await db
-      .select({ id: games.id })
-      .from(games)
-      .where(and(eq(games.ownerId, user.id), eq(games.romStoragePath, key)))
-      .limit(1);
-    safeToDelete = rows.length === 0;
-    console.warn("Unable to abort multipart upload", error);
-  }
+  const db = await getDb();
+  const rows = await db
+    .select({ id: games.id })
+    .from(games)
+    .where(and(eq(games.ownerId, user.id), eq(games.id, gameId)))
+    .limit(1);
+  if (rows[0]) return NextResponse.json({ ok: true });
 
-  if (safeToDelete) {
-    await deleteStoredFile(key);
-    if (coverStoragePath && isOwnedCoverStorageKey(coverStoragePath, user.id)) {
-      await deleteStoredFile(coverStoragePath);
-    }
-  }
-
+  await Promise.all([deleteStoredFile(romStoragePath), deleteStoredFile(coverStoragePath)]);
   return NextResponse.json({ ok: true });
 }

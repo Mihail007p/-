@@ -1,30 +1,25 @@
-import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { boolean, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 const generatedId = () => globalThis.crypto.randomUUID();
 
-export const users = sqliteTable("users", {
+export const users = pgTable("users", {
   id: text("id").primaryKey().$defaultFn(generatedId),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   displayName: text("display_name").notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .default(sql`(unixepoch())`),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const sessions = sqliteTable("sessions", {
+export const sessions = pgTable("sessions", {
   token: text("token").primaryKey().$defaultFn(() => `${generatedId()}${generatedId()}`),
   userId: text("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .default(sql`(unixepoch())`),
-  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 });
 
-export const games = sqliteTable("games", {
+export const games = pgTable("games", {
   id: text("id").primaryKey().$defaultFn(generatedId),
   ownerId: text("owner_id")
     .notNull()
@@ -36,10 +31,8 @@ export const games = sqliteTable("games", {
   romSizeBytes: integer("rom_size_bytes").notNull().default(0),
   coverStoragePath: text("cover_storage_path"),
   coverFilename: text("cover_filename"),
-  isFavorite: integer("is_favorite", { mode: "boolean" }).notNull().default(false),
+  isFavorite: boolean("is_favorite").notNull().default(false),
   playCount: integer("play_count").notNull().default(0),
-  lastPlayedAt: integer("last_played_at", { mode: "timestamp" }),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .default(sql`(unixepoch())`),
+  lastPlayedAt: timestamp("last_played_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

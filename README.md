@@ -1,68 +1,73 @@
 # CloudArcade
 
-CloudArcade is a browser-based game library and installable Progressive Web App (PWA). It runs user-provided ROM files with EmulatorJS; it does not include game ROMs. The production target is Cloudflare Workers, with D1 for account/library data and R2 for ROMs and cover art.
+CloudArcade — веб-библиотека игр и устанавливаемое PWA для Android. Игры запускаются в браузере через EmulatorJS. ROM-файлы пользователь загружает сам; проект не содержит ROM-ов.
 
-## Requirements
+## Бесплатный старт: текущая схема
 
-- Node.js 22 or newer
-- npm
-- A Cloudflare account only for remote deployment (local development and preview use Wrangler's local services)
+- **Vercel Hobby** — хостинг Next.js и публичный HTTPS URL. Бесплатный тариф предназначен для личных некоммерческих проектов.
+- **Neon Free** — PostgreSQL для аккаунтов, сессий и каталога игр.
+- **Vercel Blob Hobby, private store** — приватное хранилище ROM-файлов и обложек. Загрузка идёт напрямую из браузера в Blob, а файлы выдаются через авторизованные API-маршруты приложения.
 
-## Local development
+В коде сейчас реализован этот бесплатный вариант; внешние аккаунты и ресурсы этим репозиторием не создаются. Квоты могут меняться — проверь страницы тарифов перед регистрацией. На **27 октября 2026 года** в документации указаны следующие бесплатные лимиты:
+
+- Vercel Blob Hobby: **1 ГБ хранения** и **10 ГБ передачи данных**. При лимите приложения 500 МиБ на ROM в хранилище поместится лишь примерно два самых больших ROM-файла, ещё до учёта обложек. Каждая загрузка/выдача файла расходует трафик.
+- Neon Free: **1 ГБ PostgreSQL-хранилища**. ROM-файлы в базу не записываются.
+- Vercel Hobby бесплатен для личного некоммерческого использования.
+
+Если бесплатная квота закончится, загрузки или чтение могут перестать работать до освобождения/сброса квоты. Для этого проекта не включай платные дополнения и не загружай больше, чем позволяет бесплатное хранилище.
+
+Тарифы: [Vercel Hobby](https://vercel.com/docs/plans/hobby), [Vercel Blob](https://vercel.com/docs/vercel-blob/usage-and-pricing), [Neon](https://neon.com/pricing).
+
+## Развёртывание
+
+Регистрация в сервисах и связывание GitHub-репозитория выполняются пользователем в браузере; здесь не создаются аккаунты, базы, Blob store или production deployment.
+
+1. Создай **Neon Free** PostgreSQL-проект. Сохрани строку подключения `DATABASE_URL` из панели Neon (с `sslmode=require`; для серверного приложения предпочти pooled connection string).
+2. В Vercel импортируй GitHub-репозиторий `Mihail007p/-` как проект Next.js.
+3. В Vercel создай **private Blob store** и подключи его к проекту. Проверь, что в переменных окружения проекта появился `BLOB_READ_WRITE_TOKEN`.
+4. В настройках Vercel → **Environment Variables** добавь `DATABASE_URL` и `BLOB_READ_WRITE_TOKEN` для **Production**. Для работающих Preview deployments также нужны переменные окружения; не подключай Preview к production-базе, если не хочешь, чтобы тестовые данные попали в основную библиотеку.
+5. Оставь стандартную команду сборки Vercel. Скрипт `vercel-build` применяет миграции Drizzle только для Production deployment, затем собирает Next.js. Для Preview выполняется только сборка.
+6. После успешного deployment открой HTTPS-адрес `*.vercel.app`, зарегистрируй аккаунт CloudArcade и добавь игру. В Vercel у проекта будет постоянный публичный HTTPS URL.
+
+Если регистрационная форма просит сведения, которые ты не хочешь предоставлять, не указывай выдуманный адрес — остановись до создания ресурсов.
+
+### Установка на Tecno Pova Neo 3 (Android)
+
+1. Открой production HTTPS-адрес в **Chrome** (не во встроенном браузере мессенджера).
+2. Нажми **«Установить приложение»** в CloudArcade. Если Android не показывает системное окно, открой меню Chrome `⋮` → **«Установить приложение»** или **«Добавить на главный экран»**.
+3. Запусти CloudArcade с нового значка на главном экране. При первом входе и загрузке игр нужен интернет.
+
+PWA устанавливается с сайта; APK не требуется. Для iPhone/iPad: Safari → **Поделиться** → **На экран «Домой»**.
+
+## Локальная разработка
+
+Нужны Node.js 22+ и npm. Создай Neon database и private Blob store (либо используй отдельные тестовые ресурсы), затем заполни локальные значения:
 
 ```bash
 npm ci
-cp .dev.vars.example .dev.vars
-npm run db:migrate:local
+cp .env.example .env
+# В .env укажи DATABASE_URL и BLOB_READ_WRITE_TOKEN
+npm run db:migrate
 npm run dev
 ```
 
-Open <http://localhost:3000>. Next.js development mode uses the bindings in `wrangler.jsonc` through OpenNext's local Cloudflare integration. `.dev.vars` is for local values and must not be committed.
+Открой <http://localhost:3000>. Команда миграции применяет SQL из `drizzle/` к базе, указанной в `.env`; не запускай её против production-базы для локальных экспериментов.
 
-To test the built app in the Workers runtime rather than Next's development server:
-
-```bash
-npm run cf:preview
-```
-
-Wrangler starts a local Worker preview (normally at <http://localhost:8787>). The D1 migration must be applied locally first. ROM uploads are stored in Wrangler's local R2 emulation.
-
-## Cloudflare setup and deployment
-
-1. Install dependencies and authenticate with Wrangler:
-   ```bash
-   npm ci
-   npx wrangler login
-   ```
-2. Create the remote database and bucket:
-   ```bash
-   npx wrangler d1 create cloudarcade-db
-   npx wrangler r2 bucket create cloudarcade-roms
-   ```
-3. Copy the D1 `database_id` returned by Wrangler into `wrangler.jsonc`. Keep the D1 binding name `DB` and R2 binding name `ROM_FILES`; if you choose a different bucket name, update `bucket_name` too.
-4. Apply the D1 schema and deploy:
-   ```bash
-   npm run db:migrate:remote
-   npm run cf:deploy
-   ```
-5. Wrangler prints the public `workers.dev` URL. Add a custom domain in Cloudflare if desired. The PWA requires HTTPS, which Cloudflare provides for its Worker URL.
-
-The checked-in D1 ID is intentionally a placeholder, so remote migrations and deployment will fail until it is replaced with the ID from your Cloudflare account. Never commit credentials or `.dev.vars` values. To change the schema, run `npm run db:generate`, review the generated SQL in `drizzle/`, then apply it locally and remotely with the corresponding migration commands.
-
-## Useful checks
+Полезные команды:
 
 ```bash
 npm run lint
 npm run typecheck
-npm run cf:build
+npm run build
+npm run db:generate
+npm run db:migrate
 ```
 
-## Install on a device
+После изменения схемы сгенерируй миграцию, проверь SQL в `drizzle/`, затем примени её к нужной базе. Не коммить `.env` или токены.
 
-CloudArcade is installed from its public HTTPS website as a PWA, not as an APK or native emulator package.
+## Ограничения и данные
 
-- **Android / Chrome:** open the HTTPS site and press **Установить приложение**. If no prompt appears, open Chrome's menu and choose **Установить приложение** or **Добавить на главный экран**.
-- **iPhone / iPad:** open the site in Safari, tap **Поделиться**, then **На экран «Домой»**.
-- **Desktop / Edge:** use the install icon in the address bar or the browser menu's install option.
-
-The app needs an internet connection to authenticate, read private ROMs, and load the EmulatorJS runtime from its CDN. The service worker caches the offline information page and icons; it deliberately does not cache private library/API responses or game files. Uploads are sent to the Worker in 20 MiB chunks to stay below Cloudflare's per-request body limit; the current app limit is 500 MiB per ROM and 8 MiB per cover.
+- Максимум одного ROM-файла — **500 МиБ**, обложки — **8 МиБ**. Бесплатные 1 ГБ Blob — общий объём ROM-ов и обложек.
+- ROM-ы и обложки хранятся в приватном Vercel Blob; маршруты скачивания проверяют пользовательскую сессию. Не делись приватными файлами и не загружай чужие ROM-ы без прав.
+- Service Worker кэширует страницу офлайн-справки и иконки, но не приватные API-ответы и не игры. Для входа, библиотеки, игр и EmulatorJS из CDN нужен интернет.
+- Подробности бесплатных лимитов могут измениться; всегда сверяйся с действующими правилами Vercel и Neon.
