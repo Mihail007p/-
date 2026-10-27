@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "CloudArcade — играй в свои игры",
     short_name: "CloudArcade",
     description:
-      "Платформа для запуска собственных игровых ROM-файлов прямо в браузере через эмуляцию — устанавливается на телефон как приложение.",
+      "Личная библиотека игр для запуска собственных ROM-файлов прямо в браузере.",
     start_url: "/library",
     scope: "/",
     display: "standalone",

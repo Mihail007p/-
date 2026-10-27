@@ -45,6 +45,7 @@ export default function EmulatorPlayer({
 
   useEffect(() => {
     let cancelled = false;
+    const gameContainer = containerRef.current;
     const scriptEl = document.createElement("script");
 
     window.EJS_player = "#ejs-game-container";
@@ -88,11 +89,10 @@ export default function EmulatorPlayer({
       delete window.EJS_threads;
       delete window.EJS_ready;
       delete window.EJS_emulator;
-      if (containerRef.current) {
-        containerRef.current.innerHTML = "";
+      if (gameContainer) {
+        gameContainer.innerHTML = "";
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, core, romUrl, title]);
 
   return (
