@@ -1,16 +1,28 @@
 "use client";
 
+import { upload } from "@vercel/blob/client";
 import { useState, type FormEvent } from "react";
 import { SYSTEMS } from "@/lib/systems";
 import type { ClientGame } from "@/lib/types";
 
 type UploadSession = {
   gameId: string;
-  key: string;
-  uploadId: string;
-  partSize: number;
+  romStoragePath: string;
   coverStoragePath: string | null;
   coverFilename: string | null;
+};
+
+type UploadedGame = {
+  id: string;
+  title: string;
+  system: string;
+  romFilename: string;
+  romSizeBytes: number;
+  coverStoragePath: string | null;
+  isFavorite: boolean;
+  playCount: number;
+  lastPlayedAt: string | null;
+  createdAt: string;
 };
 
 export default function UploadModal({
@@ -39,67 +51,80 @@ export default function UploadModal({
 
     setLoading(true);
     let session: UploadSession | null = null;
+    let uploadedRomPath: string | null = null;
+    let uploadedCoverPath: string | null = null;
     let completed = false;
 
     try {
-      const metadata = new FormData();
-      metadata.set("title", title);
-      metadata.set("system", system);
-      metadata.set("romFilename", romFile.name);
-      metadata.set("romSizeBytes", String(romFile.size));
-      if (coverFile) metadata.set("cover", coverFile);
-
-      const startResponse = await fetch("/api/games/upload/start", { method: "POST", body: metadata });
-      const startData = (await startResponse.json().catch(() => ({}))) as Partial<UploadSession> & { error?: string };
+      const startResponse = await fetch("/api/games/upload/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          system,
+          romFilename: romFile.name,
+          romSizeBytes: romFile.size,
+          coverFilename: coverFile?.name ?? null,
+          coverSizeBytes: coverFile?.size ?? null,
+        }),
+      });
+      const startData = (await startResponse.json().catch(() => ({}))) as {
+        error?: string;
+        gameId?: unknown;
+        romStoragePath?: unknown;
+        coverStoragePath?: unknown;
+      };
       if (!startResponse.ok) throw new Error(startData.error ?? "Не удалось начать загрузку игры");
-      if (
-        typeof startData.gameId !== "string" ||
-        typeof startData.key !== "string" ||
-        typeof startData.uploadId !== "string" ||
-        typeof startData.partSize !== "number"
-      ) {
+      if (typeof startData.gameId !== "string" || typeof startData.romStoragePath !== "string") {
         throw new Error("Сервер вернул некорректные данные загрузки");
       }
       session = {
         gameId: startData.gameId,
-        key: startData.key,
-        uploadId: startData.uploadId,
-        partSize: startData.partSize,
+        romStoragePath: startData.romStoragePath,
         coverStoragePath: typeof startData.coverStoragePath === "string" ? startData.coverStoragePath : null,
-        coverFilename: typeof startData.coverFilename === "string" ? startData.coverFilename : null,
+        coverFilename: coverFile?.name ?? null,
       };
 
-      const partCount = Math.ceil(romFile.size / session.partSize);
-      const parts: Array<{ partNumber: number; etag: string }> = [];
-      for (let index = 0; index < partCount; index += 1) {
-        const partNumber = index + 1;
-        const start = index * session.partSize;
-        const end = Math.min(start + session.partSize, romFile.size);
-        const chunk = romFile.slice(start, end);
-        const query = new URLSearchParams({
-          key: session.key,
-          uploadId: session.uploadId,
-          partNumber: String(partNumber),
-        });
-        const partResponse = await fetch(`/api/games/upload/part?${query}`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/octet-stream",
-            "X-Chunk-Length": String(chunk.size),
+      const totalBytes = romFile.size + (coverFile?.size ?? 0);
+      const romBlob = await upload(session.romStoragePath, romFile, {
+        access: "private",
+        contentType: "application/octet-stream",
+        handleUploadUrl: "/api/games/upload/blob",
+        multipart: true,
+        clientPayload: JSON.stringify({
+          gameId: session.gameId,
+          kind: "rom",
+          filename: romFile.name,
+          system,
+        }),
+        onUploadProgress: ({ loaded }) => {
+          setProgress(Math.min(99, Math.floor((loaded / totalBytes) * 100)));
+        },
+      });
+      uploadedRomPath = romBlob.pathname;
+
+      if (coverFile && session.coverStoragePath) {
+        const coverContentType = {
+          png: "image/png",
+          jpg: "image/jpeg",
+          jpeg: "image/jpeg",
+          webp: "image/webp",
+          gif: "image/gif",
+        }[coverFile.name.split(".").at(-1)?.toLowerCase() ?? ""];
+        const coverBlob = await upload(session.coverStoragePath, coverFile, {
+          access: "private",
+          contentType: coverContentType,
+          handleUploadUrl: "/api/games/upload/blob",
+          clientPayload: JSON.stringify({
+            gameId: session.gameId,
+            kind: "cover",
+            filename: coverFile.name,
+          }),
+          onUploadProgress: ({ loaded }) => {
+            setProgress(Math.min(99, Math.floor(((romFile.size + loaded) / totalBytes) * 100)));
           },
-          body: chunk,
         });
-        const partData = (await partResponse.json().catch(() => ({}))) as {
-          error?: string;
-          partNumber?: number;
-          etag?: string;
-        };
-        if (!partResponse.ok) throw new Error(partData.error ?? `Не удалось загрузить часть ${partNumber}`);
-        if (typeof partData.partNumber !== "number" || typeof partData.etag !== "string") {
-          throw new Error(`Сервер вернул некорректную часть ${partNumber}`);
-        }
-        parts.push({ partNumber: partData.partNumber, etag: partData.etag });
-        setProgress(Math.round((partNumber / partCount) * 100));
+        uploadedCoverPath = coverBlob.pathname;
       }
 
       const completeResponse = await fetch("/api/games/upload/complete", {
@@ -107,31 +132,18 @@ export default function UploadModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           gameId: session.gameId,
-          key: session.key,
-          uploadId: session.uploadId,
-          parts,
           title,
           system,
           romFilename: romFile.name,
           romSizeBytes: romFile.size,
-          coverStoragePath: session.coverStoragePath,
-          coverFilename: session.coverFilename,
+          romStoragePath: uploadedRomPath,
+          coverStoragePath: uploadedCoverPath,
+          coverFilename: uploadedCoverPath ? session.coverFilename : null,
         }),
       });
       const completeData = (await completeResponse.json().catch(() => ({}))) as {
         error?: string;
-        game?: {
-          id: string;
-          title: string;
-          system: string;
-          romFilename: string;
-          romSizeBytes: number;
-          coverStoragePath: string | null;
-          isFavorite: boolean;
-          playCount: number;
-          lastPlayedAt: string | null;
-          createdAt: string;
-        };
+        game?: UploadedGame;
       };
       if (!completeResponse.ok) throw new Error(completeData.error ?? "Не удалось сохранить игру");
       if (!completeData.game) throw new Error("Сервер не вернул созданную игру");
@@ -156,9 +168,9 @@ export default function UploadModal({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            key: session.key,
-            uploadId: session.uploadId,
-            coverStoragePath: session.coverStoragePath,
+            gameId: session.gameId,
+            romStoragePath: uploadedRomPath,
+            coverStoragePath: uploadedCoverPath,
           }),
         }).catch(() => undefined);
       }
@@ -222,7 +234,7 @@ export default function UploadModal({
               className="w-full rounded-xl border border-white/10 bg-slate-800 px-4 py-2 text-sm text-slate-300 file:mr-3 file:rounded-full file:border-0 file:bg-violet-600 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white"
             />
             <p className="mt-1 text-xs text-slate-500">
-              Допустимые расширения: {SYSTEMS.find((s) => s.id === system)?.extensions.join(", ")}. Максимум 500 МБ; файл отправляется частями.
+              Допустимые расширения: {SYSTEMS.find((s) => s.id === system)?.extensions.join(", ")}. Максимум 500 МБ; файл отправляется напрямую в облако.
             </p>
           </div>
 

@@ -25,15 +25,15 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   }
 
   const object = await getStoredFile(game.romStoragePath);
-  if (!object) {
+  if (!object || object.statusCode !== 200) {
     return NextResponse.json({ error: "Файл не найден" }, { status: 404 });
   }
 
-  return new NextResponse(object.body, {
+  return new NextResponse(object.stream, {
     headers: {
       "Content-Type": "application/octet-stream",
-      "Content-Length": String(object.size),
-      "Content-Disposition": `inline; filename="${encodeURIComponent(game.romFilename)}"`,
+      "Content-Length": String(object.blob.size),
+      "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(game.romFilename)}`,
       "X-Content-Type-Options": "nosniff",
       "Cache-Control": "private, max-age=31536000, immutable",
     },
