@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { users } from "@/db/schema";
 import { verifyPassword } from "@/lib/password";
 import { createSessionForUser } from "@/lib/session";
@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
 
   const email = (body.email ?? "").trim().toLowerCase();
   const password = body.password ?? "";
+  const db = await getDb();
 
   const rows = await db.select().from(users).where(eq(users.email, email)).limit(1);
   const user = rows[0];

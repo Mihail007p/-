@@ -26,7 +26,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
         setError(data.error ?? "Что-то пошло не так");
         return;

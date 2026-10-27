@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { games } from "@/db/schema";
 import { getCurrentUser } from "@/lib/session";
 import { getSystem } from "@/lib/systems";
@@ -13,6 +13,7 @@ export default async function PlayPage({ params }: { params: Promise<{ id: strin
   if (!user) redirect("/login");
 
   const { id } = await params;
+  const db = await getDb();
   const rows = await db
     .select()
     .from(games)

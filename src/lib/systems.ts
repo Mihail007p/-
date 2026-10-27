@@ -31,6 +31,12 @@ export function getSystem(id: string): SystemDef | undefined {
 
 export const MAX_ROM_SIZE_BYTES = 500 * 1024 * 1024; // 500MB
 export const MAX_COVER_SIZE_BYTES = 8 * 1024 * 1024; // 8MB
+export const MAX_GAME_TITLE_LENGTH = 120;
+export const MAX_ROM_FILENAME_LENGTH = 255;
+
+export function isValidRomFilename(filename: string): boolean {
+  return filename.length > 0 && filename.length <= MAX_ROM_FILENAME_LENGTH && !/[\\/\u0000-\u001f\u007f]/.test(filename);
+}
 
 export function isExtensionAllowed(filename: string, system: SystemDef): boolean {
   const lower = filename.toLowerCase();

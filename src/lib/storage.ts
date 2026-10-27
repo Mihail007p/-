@@ -1,50 +1,99 @@
-import { mkdir, writeFile, unlink } from "fs/promises";
-import { createReadStream, existsSync } from "fs";
-import { stat } from "fs/promises";
-import path from "path";
-import { randomUUID } from "crypto";
-import { Readable } from "stream";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 
-const STORAGE_ROOT = path.join(process.cwd(), "storage");
-export const ROMS_DIR = path.join(STORAGE_ROOT, "roms");
-export const COVERS_DIR = path.join(STORAGE_ROOT, "covers");
+export const ROM_PART_SIZE_BYTES = 20 * 1024 * 1024;
 
-async function ensureDirs() {
-  await mkdir(ROMS_DIR, { recursive: true });
-  await mkdir(COVERS_DIR, { recursive: true });
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function isOwnedRomStorageKey(key: string, ownerId: string) {
+  const segments = key.split("/");
+  return (
+    segments.length === 4 &&
+    segments[0] === "roms" &&
+    segments[1] === ownerId &&
+    UUID_PATTERN.test(segments[2]) &&
+    /^[0-9a-f-]{36}\.[a-z0-9]{1,10}$/i.test(segments[3])
+  );
+}
+
+export function isOwnedCoverStorageKey(key: string, ownerId: string) {
+  const segments = key.split("/");
+  return (
+    segments.length === 3 &&
+    segments[0] === "covers" &&
+    segments[1] === ownerId &&
+    /^[0-9a-f-]{36}\.[a-z0-9]{1,10}$/i.test(segments[2])
+  );
+}
+
+export async function getStorageBucket(): Promise<R2Bucket> {
+  const { env } = await getCloudflareContext({ async: true });
+  return env.ROM_FILES;
+}
+
+function extensionOf(filename: string) {
+  const match = filename.match(/\.[a-zA-Z0-9]{1,10}$/);
+  return match?.[0].toLowerCase() ?? "";
 }
 
 export async function saveUploadedFile(
   file: File,
-  dir: string,
-): Promise<{ filename: string; absolutePath: string; size: number }> {
-  await ensureDirs();
-  const ext = path.extname(file.name) || "";
-  const filename = `${randomUUID()}${ext.toLowerCase()}`;
-  const absolutePath = path.join(dir, filename);
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-  await writeFile(absolutePath, buffer);
-  return { filename, absolutePath, size: buffer.length };
+  kind: "covers",
+  ownerId: string,
+): Promise<{ filename: string; storagePath: string; size: number }> {
+  const key = `${kind}/${ownerId}/${crypto.randomUUID()}${extensionOf(file.name)}`;
+  const bucket = await getStorageBucket();
+  const object = await bucket.put(key, await file.arrayBuffer(), {
+    httpMetadata: { contentType: file.type || "application/octet-stream" },
+  });
+
+  return {
+    filename: key.split("/").at(-1) ?? key,
+    storagePath: key,
+    size: object.size,
+  };
 }
 
-export async function deleteStoredFile(absolutePath: string | null | undefined) {
-  if (!absolutePath) return;
+export async function deleteStoredFile(key: string | null | undefined) {
+  if (!key) return;
   try {
-    if (existsSync(absolutePath)) {
-      await unlink(absolutePath);
-    }
-  } catch {
-    // ignore cleanup errors
+    const bucket = await getStorageBucket();
+    await bucket.delete(key);
+  } catch (error) {
+    console.error("Failed to delete R2 object", error);
   }
 }
 
-export async function getFileSize(absolutePath: string): Promise<number> {
-  const stats = await stat(absolutePath);
-  return stats.size;
+export async function startRomMultipartUpload({
+  ownerId,
+  gameId,
+  system,
+  filename,
+}: {
+  ownerId: string;
+  gameId: string;
+  system: string;
+  filename: string;
+}) {
+  const key = `roms/${ownerId}/${gameId}/${crypto.randomUUID()}${extensionOf(filename)}`;
+  const bucket = await getStorageBucket();
+  const upload = await bucket.createMultipartUpload(key, {
+    httpMetadata: { contentType: "application/octet-stream" },
+    customMetadata: { ownerId, gameId, system },
+  });
+  return { key, uploadId: upload.uploadId };
 }
 
-export function readFileAsWebStream(absolutePath: string): ReadableStream {
-  const nodeStream = createReadStream(absolutePath);
-  return Readable.toWeb(nodeStream) as ReadableStream;
+export async function uploadRomPart(key: string, uploadId: string, partNumber: number, body: ReadableStream) {
+  const bucket = await getStorageBucket();
+  return bucket.resumeMultipartUpload(key, uploadId).uploadPart(partNumber, body);
+}
+
+export async function abortRomMultipartUpload(key: string, uploadId: string) {
+  const bucket = await getStorageBucket();
+  await bucket.resumeMultipartUpload(key, uploadId).abort();
+}
+
+export async function getStoredFile(key: string) {
+  const bucket = await getStorageBucket();
+  return bucket.get(key);
 }

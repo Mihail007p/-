@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
-import { existsSync } from "fs";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { games } from "@/db/schema";
 import { getCurrentUser } from "@/lib/session";
-import { readFileAsWebStream, getFileSize } from "@/lib/storage";
+import { getStoredFile } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -14,25 +13,28 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Требуется вход" }, { status: 401 });
   }
   const { id } = await params;
-
+  const db = await getDb();
   const rows = await db
     .select()
     .from(games)
     .where(and(eq(games.id, id), eq(games.ownerId, user.id)))
     .limit(1);
   const game = rows[0];
-  if (!game || !existsSync(game.romStoragePath)) {
+  if (!game) {
     return NextResponse.json({ error: "Файл не найден" }, { status: 404 });
   }
 
-  const size = await getFileSize(game.romStoragePath);
-  const stream = readFileAsWebStream(game.romStoragePath);
+  const object = await getStoredFile(game.romStoragePath);
+  if (!object) {
+    return NextResponse.json({ error: "Файл не найден" }, { status: 404 });
+  }
 
-  return new NextResponse(stream, {
+  return new NextResponse(object.body, {
     headers: {
       "Content-Type": "application/octet-stream",
-      "Content-Length": String(size),
+      "Content-Length": String(object.size),
       "Content-Disposition": `inline; filename="${encodeURIComponent(game.romFilename)}"`,
+      "X-Content-Type-Options": "nosniff",
       "Cache-Control": "private, max-age=31536000, immutable",
     },
   });

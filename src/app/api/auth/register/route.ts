@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { db } from "@/db";
+import { getDb } from "@/db";
 import { users } from "@/db/schema";
 import { hashPassword } from "@/lib/password";
 import { createSessionForUser } from "@/lib/session";
@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Введите имя пользователя" }, { status: 400 });
   }
 
+  const db = await getDb();
   const existing = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
   if (existing.length > 0) {
     return NextResponse.json({ error: "Пользователь с таким email уже существует" }, { status: 409 });
