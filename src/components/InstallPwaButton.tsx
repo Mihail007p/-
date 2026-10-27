@@ -1,70 +1,108 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
+const subscribeToNothing = () => () => {};
+
+function subscribeToStandaloneMode(onChange: () => void) {
+  const mediaQuery = window.matchMedia("(display-mode: standalone)");
+  mediaQuery.addEventListener("change", onChange);
+  return () => mediaQuery.removeEventListener("change", onChange);
+}
+
+function getStandaloneSnapshot() {
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true
+  );
+}
+
+function getIosSnapshot() {
+  const userAgent = window.navigator.userAgent;
+  return /iphone|ipad|ipod/i.test(userAgent) && !(window as Window & { MSStream?: unknown }).MSStream;
+}
+
 export default function InstallPwaButton() {
+  const isStandalone = useSyncExternalStore(subscribeToStandaloneMode, getStandaloneSnapshot, () => false);
+  const isIos = useSyncExternalStore(subscribeToNothing, getIosSnapshot, () => false);
+  const [installedByEvent, setInstalledByEvent] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [installed, setInstalled] = useState(false);
-  const [isIos, setIsIos] = useState(false);
-  const [showIosHint, setShowIosHint] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(false);
 
   useEffect(() => {
-    const standalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true;
-    setInstalled(standalone);
-
-    const ua = window.navigator.userAgent;
-    setIsIos(/iphone|ipad|ipod/i.test(ua) && !(window as unknown as { MSStream?: unknown }).MSStream);
-
-    const handler = (event: Event) => {
+    const onBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
       setDeferredPrompt(event as BeforeInstallPromptEvent);
     };
-    window.addEventListener("beforeinstallprompt", handler);
+    const onInstalled = () => {
+      setInstalledByEvent(true);
+      setDeferredPrompt(null);
+      setShowInstructions(false);
+    };
 
-    const onInstalled = () => setInstalled(true);
+    window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
     window.addEventListener("appinstalled", onInstalled);
 
     return () => {
-      window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onInstalled);
     };
   }, []);
 
-  if (installed) return null;
+  if (isStandalone || installedByEvent) return null;
 
   async function handleClick() {
-    if (deferredPrompt) {
-      await deferredPrompt.prompt();
-      await deferredPrompt.userChoice;
-      setDeferredPrompt(null);
+    if (!deferredPrompt) {
+      setShowInstructions((visible) => !visible);
       return;
     }
-    if (isIos) {
-      setShowIosHint((v) => !v);
+
+    try {
+      await deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice.outcome === "accepted") setInstalledByEvent(true);
+    } catch {
+      setShowInstructions(true);
+    } finally {
+      setDeferredPrompt(null);
     }
   }
-
-  if (!deferredPrompt && !isIos) return null;
 
   return (
     <div className="relative">
       <button
+        type="button"
         onClick={handleClick}
+        aria-expanded={showInstructions}
+        aria-controls="pwa-install-instructions"
         className="flex items-center gap-2 rounded-full bg-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-violet-900/40 transition hover:bg-violet-500 active:scale-95"
       >
         <span aria-hidden>📲</span> Установить приложение
       </button>
-      {showIosHint && (
-        <div className="absolute right-0 z-20 mt-2 w-64 rounded-xl border border-slate-700 bg-slate-900 p-3 text-xs text-slate-200 shadow-xl">
-          В Safari нажмите <span className="font-semibold">Поделиться</span> → «На экран «Домой»», чтобы установить
-          CloudArcade как приложение.
+      {showInstructions && (
+        <div
+          id="pwa-install-instructions"
+          role="status"
+          className="absolute right-0 z-30 mt-2 w-72 rounded-xl border border-slate-700 bg-slate-900 p-4 text-xs leading-relaxed text-slate-200 shadow-xl sm:w-80"
+        >
+          {isIos ? (
+            <>
+              В Safari нажмите <span className="font-semibold">Поделиться</span>, затем выберите
+              <span className="font-semibold"> «На экран “Домой”»</span>.
+            </>
+          ) : (
+            <>
+              В Chrome или Edge откройте меню браузера и выберите
+              <span className="font-semibold"> «Установить приложение»</span> или
+              <span className="font-semibold"> «Добавить на главный экран»</span>. Для установки сайт должен
+              открываться по HTTPS (на компьютере также подходит localhost).
+            </>
+          )}
         </div>
       )}
     </div>

@@ -13,16 +13,9 @@ export default async function HomePage() {
   return (
     <main className="bg-slate-950">
       <section className="relative isolate overflow-hidden">
-        <div className="absolute inset-0 -z-10">
-          <Image
-            src="/images/hero.jpg"
-            alt=""
-            fill
-            priority
-            className="object-cover opacity-50"
-            sizes="100vw"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-950/40 via-slate-950/80 to-slate-950" />
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,rgba(124,58,237,0.30),transparent_62%)]">
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-950/40 via-slate-950/75 to-slate-950" />
+          <div className="absolute right-[12%] top-24 h-56 w-56 rounded-full bg-violet-700/20 blur-3xl sm:h-80 sm:w-80" />
         </div>
 
         <div className="mx-auto flex max-w-6xl flex-col items-start px-6 pb-24 pt-20 sm:pt-28">
