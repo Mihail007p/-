@@ -1,0 +1,21 @@
+{
+  "name": "neon-district",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Neon District — open-world crime sandbox in the browser (Three.js)",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 4173",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "0.187.0"
+  },
+  "devDependencies": {
+    "@types/three": "0.187.0",
+    "typescript": "5.9.3",
+    "vite": "8.3.8"
+  }
+}
