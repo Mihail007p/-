@@ -41,6 +41,8 @@ export class BoxBatcher {
   private positions: number[] = [];
   private normals: number[] = [];
   private uvs: number[] = [];
+  private colors: number[] = [];
+  private hasColor = false;
 
   /**
    * @param uvScale world units per texture tile, so textures keep a constant
@@ -59,6 +61,10 @@ export class BoxBatcher {
       skipBottom?: boolean;
       /** rotate the box around its own centre (radians, Y axis) */
       rotY?: number;
+      /** per-box tint multiplied into the material colour */
+      tint?: [number, number, number];
+      /** vertical gradient: darker towards the ground (fake contact shading) */
+      gradient?: boolean;
     } = {}
   ) {
     const uvScale = opts.uvPerMeter ?? 1;
@@ -112,12 +118,22 @@ export class BoxBatcher {
         [u0, v1],
       ];
       const uvOrder = [0, 1, 2, 0, 2, 3];
+      const tint = opts.tint ?? [1, 1, 1];
+      const grad = opts.gradient ?? false;
       for (let i = 0; i < 6; i++) {
         const p = tri[i];
         this.positions.push(p[0], p[1], p[2]);
         this.normals.push(n[0], n[1], n[2]);
         const uv = cornerUV[uvOrder[i]];
         this.uvs.push(uv[0], uv[1]);
+        if (tint[0] !== 1 || tint[1] !== 1 || tint[2] !== 1) this.hasColor = true;
+        let k = 1;
+        if (grad) {
+          // 0.72 at street level -> 1.0 at the top: cheap ambient occlusion
+          const f = (p[1] - y0) / Math.max(0.001, y1 - y0);
+          k = 0.72 + 0.28 * Math.min(1, Math.max(0, f));
+        }
+        this.colors.push(tint[0] * k, tint[1] * k, tint[2] * k);
       }
     }
   }
@@ -151,6 +167,7 @@ export class BoxBatcher {
       this.positions.push(p[0], p[1], p[2]);
       this.normals.push(0, 1, 0);
       this.uvs.push(corners[i][0] / width + 0.5, corners[i][1] / length + 0.5);
+      this.colors.push(1, 1, 1);
     }
   }
 
@@ -159,6 +176,9 @@ export class BoxBatcher {
     geo.setAttribute("position", new THREE.Float32BufferAttribute(this.positions, 3));
     geo.setAttribute("normal", new THREE.Float32BufferAttribute(this.normals, 3));
     geo.setAttribute("uv", new THREE.Float32BufferAttribute(this.uvs, 2));
+    if (this.hasColor) {
+      geo.setAttribute("color", new THREE.Float32BufferAttribute(this.colors, 3));
+    }
     geo.computeBoundingSphere();
     return geo;
   }

@@ -10,7 +10,7 @@ const dom = new (await import("jsdom")).JSDOM(`<!doctype html><body>
 globalThis.window = dom.window;
 globalThis.document = dom.window.document;
 
-const { wishDirection } = await import("../.test-build/game/movement.js");
+const { wishDirection, resolveWish } = await import("../.test-build/game/movement.js");
 
 let fails = 0;
 const check = (name, ok, info = "") => {
@@ -61,6 +61,19 @@ d = wishDirection(0, { x: 0.7071, y: 0.7071 });
 check("diagonal keeps unit length", Math.abs(d.length() - 1) < 1e-3, `len=${d.length().toFixed(3)}`);
 d = wishDirection(0, { x: 2, y: 2 });
 check("oversized input is clamped", d.length() <= 1.0001, `len=${d.length().toFixed(3)}`);
+
+// ---- movement schemes -------------------------------------------------
+// camera-relative: strafe follows the screen regardless of where the player faces
+let d2 = resolveWish("camera", 0, Math.PI * 0.75, { x: -1, y: 0 }, new THREE.Vector3());
+check("scheme camera: stick left -> -X even if the player faces away", near(d2.x, -1), fmt(d2));
+
+// character-relative: stick up walks where the character faces
+d2 = resolveWish("character", 0, Math.PI, { x: 0, y: 1 }, new THREE.Vector3());
+check("scheme character: stick up -> character forward (+Z)", near(d2.z, 1), fmt(d2));
+d2 = resolveWish("character", 0, Math.PI, { x: 1, y: 0 }, new THREE.Vector3());
+check("scheme character: stick right -> character's right (-X)", near(d2.x, -1), fmt(d2));
+d2 = resolveWish("character", 0, Math.PI / 2, { x: 0, y: 1 }, new THREE.Vector3());
+check("scheme character: rotates with the character", near(d2.x, -1), fmt(d2));
 
 console.log(fails ? `\n${fails} FAILED` : "\nall movement direction tests passed");
 process.exit(fails ? 1 : 0);

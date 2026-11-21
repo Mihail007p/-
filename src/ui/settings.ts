@@ -1,6 +1,8 @@
 import { DEFAULT_SETTINGS, type CameraSettings } from "../camera";
+import type { MoveScheme } from "../game/movement";
 
 const STORAGE_KEY = "nd.camera.v1";
+const SCHEME_KEY = "nd.movement.v1";
 
 /**
  * Camera settings panel: sensitivity slider, invert Y, auto-centre.
@@ -8,7 +10,9 @@ const STORAGE_KEY = "nd.camera.v1";
  */
 export class Settings {
   current: CameraSettings;
+  scheme: MoveScheme = "camera";
   onChange: (s: CameraSettings) => void = () => {};
+  onSchemeChange: (scheme: MoveScheme) => void = () => {};
   private panel: HTMLElement;
   private open = false;
 
@@ -50,6 +54,32 @@ export class Settings {
     });
 
     document.getElementById("settings-close")!.addEventListener("click", () => this.hide());
+
+    // ------- movement scheme -------------------------------------------
+    this.scheme = (localStorage.getItem(SCHEME_KEY) as MoveScheme) || "camera";
+    const schemeButtons = document.querySelectorAll<HTMLButtonElement>("[data-scheme]");
+    const paintScheme = () => {
+      schemeButtons.forEach((b) => b.classList.toggle("active", b.dataset.scheme === this.scheme));
+    };
+    paintScheme();
+    schemeButtons.forEach((b) => {
+      b.addEventListener("click", () => {
+        this.scheme = (b.dataset.scheme as MoveScheme) ?? "camera";
+        localStorage.setItem(SCHEME_KEY, this.scheme);
+        paintScheme();
+        this.onSchemeChange(this.scheme);
+      });
+    });
+  }
+
+  /** Cycle movement scheme (used by the Tab key). */
+  cycleScheme() {
+    this.scheme = this.scheme === "camera" ? "character" : "camera";
+    localStorage.setItem(SCHEME_KEY, this.scheme);
+    document.querySelectorAll<HTMLButtonElement>("[data-scheme]").forEach((b) => {
+      b.classList.toggle("active", b.dataset.scheme === this.scheme);
+    });
+    this.onSchemeChange(this.scheme);
   }
 
   /**

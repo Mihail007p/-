@@ -86,11 +86,16 @@ export function installWorld(scene: THREE.Scene, world: World) {
   scene.background = sky;
   scene.environment = sky;
   scene.environmentIntensity = 0.85;
-  scene.fog = new THREE.Fog(0xc3d2dc, 120, 420);
+  // fog is slightly warm and starts further out, so the near city stays crisp
+  scene.fog = new THREE.Fog(0xc9d4dc, 150, 460);
 
   scene.add(world.meshes.ground, world.meshes.sidewalks, world.meshes.markings);
   for (const f of world.meshes.facades) scene.add(f.mesh);
   scene.add(world.meshes.shops, world.meshes.roofs, world.meshes.grass, world.meshes.kerbs);
+  // architectural details: cornices, balconies, AC units, awnings
+  for (const mesh of Object.values(world.meshes.details)) scene.add(mesh);
+  // shop signs, one merged group with shared materials per texture
+  scene.add(world.meshes.signs);
   scene.add(world.props.group);
 
   scene.add(world.sun);

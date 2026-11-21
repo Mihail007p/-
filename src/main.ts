@@ -6,7 +6,7 @@ import { Input } from "./input";
 import { Hud } from "./ui/hud";
 import { CameraRig } from "./camera";
 import { Settings } from "./ui/settings";
-import { wishDirection } from "./game/movement";
+import { resolveWish, type MoveScheme } from "./game/movement";
 
 /** Detect a mobile GPU budget and scale quality down accordingly. */
 function isMobile() {
@@ -77,12 +77,20 @@ settings.onChange = (s) => rig.setSettings(s);
 rig.setSettings(settings.current);
 settings.bind();
 
+let moveScheme: MoveScheme = settings.scheme;
+settings.onSchemeChange = (scheme) => (moveScheme = scheme);
+
 startBtn.addEventListener("click", start);
 window.addEventListener("keydown", (e) => {
   if (e.code === "Enter" && !overlay.classList.contains("hidden")) start();
   // C or Home: put the camera back behind the character
   if (e.code === "KeyC" || e.code === "Home") input.recenterRequested = true;
   if (e.code === "Escape") settings.hide();
+  // quick switch between camera-relative and character-relative controls
+  if (e.code === "Tab") {
+    e.preventDefault();
+    settings.cycleScheme();
+  }
 });
 
 loading.classList.add("done");
@@ -101,8 +109,9 @@ function frame() {
   const dt = Math.min(clock.getDelta(), 0.05);
 
   const axis = input.moveAxis();
-  // stick/keyboard -> world direction (unit tested in tests/movement.mjs)
-  wishDirection(rig.yaw, axis, wish);
+  // stick/keyboard -> world direction, relative to the chosen reference
+  // (unit tested in tests/movement.mjs)
+  resolveWish(moveScheme, rig.yaw, player.heading, axis, wish);
   const wantsMove = wish.lengthSq() > 0.001;
   if (wantsMove) wish.normalize();
 

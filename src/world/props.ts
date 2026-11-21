@@ -57,7 +57,7 @@ export function buildProps(world: WorldMeshes): PropsWorld {
   const crownGeo = new THREE.IcosahedronGeometry(1.7, 1);
   // squash and lift a bit so it reads as a canopy
   crownGeo.scale(1, 0.85, 1);
-  crownGeo.translate(0, 3.5, 0);
+  crownGeo.translate(0, 3.3, 0);
   const crownMat = new THREE.MeshStandardMaterial({
     color: 0x4b7a3a,
     roughness: 0.92,
@@ -67,18 +67,31 @@ export function buildProps(world: WorldMeshes): PropsWorld {
   crownMesh.castShadow = true;
 
   const m = new THREE.Matrix4();
+  // a second, smaller crown layer gives the trees a fuller, less "ball" look
+  const crown2Geo = new THREE.IcosahedronGeometry(1.15, 0);
+  crown2Geo.scale(1, 0.8, 1);
+  crown2Geo.translate(0, 4.35, 0);
+  const crown2Mesh = new THREE.InstancedMesh(crown2Geo, crownMat, treeSpots.length);
+  crown2Mesh.castShadow = true;
+
+  const q = new THREE.Quaternion();
+  const rot = new THREE.Euler();
   treeSpots.forEach((t, i) => {
     m.makeScale(t.s, t.s, t.s);
     m.setPosition(t.x, 0.15, t.z);
     trunkMesh.setMatrixAt(i, m);
-    m.makeScale(t.s, t.s, t.s);
-    m.setPosition(t.x, 0.15, t.z);
+
+    rot.set(0, rand() * Math.PI * 2, 0);
+    q.setFromEuler(rot);
+    m.compose(new THREE.Vector3(t.x, 0.15, t.z), q, new THREE.Vector3(t.s, t.s, t.s));
     crownMesh.setMatrixAt(i, m);
+    crown2Mesh.setMatrixAt(i, m);
     blockers.push({ x: t.x, z: t.z, r: 0.45 * t.s });
   });
   trunkMesh.instanceMatrix.needsUpdate = true;
   crownMesh.instanceMatrix.needsUpdate = true;
-  group.add(trunkMesh, crownMesh);
+  crown2Mesh.instanceMatrix.needsUpdate = true;
+  group.add(trunkMesh, crownMesh, crown2Mesh);
 
   // ---------------------------------------------------------------- lamps
   const poleBatch = new BoxBatcher();
@@ -163,6 +176,8 @@ export function buildProps(world: WorldMeshes): PropsWorld {
 
   // ---------------------------------------------------------------- benches / bins
   const smallBatch = new BoxBatcher();
+  const metalBatch = new BoxBatcher();
+  const bushBatch = new BoxBatcher();
   for (const park of world.parks) {
     for (let i = 0; i < 4; i++) {
       const bx = park.x0 + 3 + rand() * (park.x1 - park.x0 - 6);
@@ -172,6 +187,40 @@ export function buildProps(world: WorldMeshes): PropsWorld {
       smallBatch.add(bx + 0.75, 0.22, bz, 0.1, 0.44, 0.45, { uvPerMeter: 1 });
     }
   }
+  // street furniture along every sidewalk: bins, bollards, bushes, manholes
+  for (let i = 0; i <= LAYOUT.blocks; i++) {
+    const c = roadCenter(i);
+    for (let k = 0; k < 10; k++) {
+      const along = -CITY_HALF + 24 + rand() * (CITY_HALF * 2 - 48);
+      // bins on both sides of the road
+      for (const side of [-1, 1]) {
+        const bx = c + side * (LAYOUT.road / 2 + 2.2);
+        if (rand() < 0.5) {
+          metalBatch.add(bx, 0.45, along + side * 6, 0.42, 0.9, 0.42, { uvPerMeter: 2 });
+        }
+        // bollards near junctions
+        if (Math.abs(along) < CITY_HALF - 40 && rand() < 0.35) {
+          metalBatch.add(bx, 0.4, along + 14, 0.12, 0.8, 0.12, { uvPerMeter: 2 });
+        }
+      }
+      // bushes at block corners
+      if (rand() < 0.3) {
+        bushBatch.add(along, 0.55, c + (rand() < 0.5 ? 1 : -1) * (LAYOUT.road / 2 + 3), 1.6, 1.1, 1.6, {
+          uvPerMeter: 1,
+        });
+      }
+    }
+  }
+
+  // manhole covers and drains on the road surface
+  for (let i = 0; i <= LAYOUT.blocks; i++) {
+    const c = roadCenter(i);
+    for (let k = 0; k < 8; k++) {
+      const along = -CITY_HALF + 30 + rand() * (CITY_HALF * 2 - 60);
+      metalBatch.add(c + (rand() - 0.5) * 6, 0.015, along, 0.85, 0.03, 0.85, { uvPerMeter: 2 });
+    }
+  }
+
   const benches = new THREE.Mesh(
     smallBatch.build(),
     new THREE.MeshStandardMaterial({ color: 0x6b5138, roughness: 0.9 })
@@ -179,6 +228,21 @@ export function buildProps(world: WorldMeshes): PropsWorld {
   benches.castShadow = true;
   benches.receiveShadow = true;
   group.add(benches);
+
+  const metalProps = new THREE.Mesh(
+    metalBatch.build(),
+    new THREE.MeshStandardMaterial({ color: 0x7d838a, roughness: 0.5, metalness: 0.7 })
+  );
+  metalProps.castShadow = true;
+  group.add(metalProps);
+
+  const bushes = new THREE.Mesh(
+    bushBatch.build(),
+    new THREE.MeshStandardMaterial({ color: 0x49713a, roughness: 0.95, flatShading: true })
+  );
+  bushes.castShadow = true;
+  bushes.receiveShadow = true;
+  group.add(bushes);
 
   // ---------------------------------------------------------------- cars
   const bodies = new BoxBatcher();
@@ -229,7 +293,7 @@ export function buildProps(world: WorldMeshes): PropsWorld {
   );
 
   // a couple of representative car groups remain for future interactivity
-  return { group, trees: [trunkMesh, crownMesh], lamps, trafficLights: [], cars, blockers };
+  return { group, trees: [trunkMesh, crownMesh, crown2Mesh], lamps, trafficLights: [], cars, blockers };
 }
 
 /** Batches one parked car: body slab, cabin glass, wheels, lights. */
@@ -252,12 +316,36 @@ function batchCar(
 
   const [bx, bz] = at(0, 0);
   body.add(bx, 0.62, bz, 1.78, 0.62, 4.2, { uvPerMeter: 1 / 2, rotY: rot });
+  // bonnet + boot shoulders for a less boxy silhouette
+  const [hx, hz] = at(0, -1.5);
+  body.add(hx, 0.93, hz, 1.7, 0.16, 1.2, { uvPerMeter: 1 / 2, rotY: rot });
+  const [kx, kz] = at(0, 1.55);
+  body.add(kx, 0.95, kz, 1.72, 0.14, 1.0, { uvPerMeter: 1 / 2, rotY: rot });
 
   const [gx, gz] = at(0, -0.15);
   glass.add(gx, 1.16, gz, 1.6, 0.56, 2.1, { uvPerMeter: 1 / 2, rotY: rot });
 
   const [rx, rz] = at(0, -0.2);
   body.add(rx, 1.45, rz, 1.46, 0.1, 1.6, { uvPerMeter: 1 / 2, rotY: rot });
+
+  // mirrors
+  for (const sx of [-1, 1]) {
+    const [mx, mz] = at(sx * 0.95, -0.75);
+    dark.add(mx, 1.1, mz, 0.22, 0.12, 0.1, { uvPerMeter: 2, rotY: rot });
+  }
+  // bumpers and number plates
+  for (const [pz, py] of [[-2.14, 0.5], [2.14, 0.5]] as [number, number][]) {
+    const [px2, pz2] = at(0, pz);
+    dark.add(px2, py, pz2, 1.8, 0.22, 0.08, { uvPerMeter: 2, rotY: rot });
+    lights.add(px2, py + 0.18, pz2, 0.5, 0.13, 0.04, { uvPerMeter: 3, rotY: rot });
+  }
+  // roof rails on some cars
+  if (Math.random() < 0.35) {
+    for (const sx of [-0.6, 0.6]) {
+      const [lxp, lzp] = at(sx, -0.2);
+      dark.add(lxp, 1.53, lzp, 0.07, 0.08, 1.5, { uvPerMeter: 3, rotY: rot });
+    }
+  }
 
   for (const [wx, wz] of [
     [-0.86, -1.35],

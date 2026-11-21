@@ -38,6 +38,12 @@
         </label>
         <input id="sens" type="range" min="0.3" max="4" step="0.05" value="2" />
 
+        <div class="row">Управление</div>
+        <div class="segmented">
+          <button type="button" data-scheme="camera" class="active">От обзора</button>
+          <button type="button" data-scheme="character">От персонажа</button>
+        </div>
+
         <label class="row check">
           <input id="invert-y" type="checkbox" />
           <span>Инвертировать обзор по вертикали</span>
@@ -49,7 +55,10 @@
         </label>
 
         <button id="settings-reset" class="settings-reset">Сбросить</button>
-        <p class="settings-tip">Двойной тап по экрану или клавиша <b>C</b> — вернуть камеру за спину.</p>
+        <p class="settings-tip">
+          Двойной тап по экрану или клавиша <b>C</b> — вернуть камеру за спину.
+          Клавиша <b>Tab</b> переключает схему управления.
+        </p>
       </div>
     </div>
 

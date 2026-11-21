@@ -87,7 +87,18 @@ export function grassTexture() {
 }
 
 /* ---------------------------------------------------------------- facades */
-export type FacadeKind = "plaster" | "brick" | "concrete" | "glass";
+/** Surface families: each has its own colour/material treatment. */
+export type FacadeKind = "plaster" | "brick" | "concrete" | "glass" | "panel" | "tile";
+
+/** All facade kinds, in the order they are generated. */
+export const FACADE_KINDS: FacadeKind[] = [
+  "plaster",
+  "brick",
+  "concrete",
+  "glass",
+  "panel",
+  "tile",
+];
 export type FacadeTextures = {
   map: THREE.Texture;
   roughnessMap: THREE.Texture;
@@ -111,7 +122,11 @@ export function facadeTextures(kind: FacadeKind): FacadeTextures {
         ? "#b3b0a8"
         : kind === "glass"
           ? "#8fb6c9"
-          : "#d8d2c4";
+          : kind === "panel"
+            ? "#c4c8c6"
+            : kind === "tile"
+              ? "#b8845e"
+              : "#d8d2c4";
 
   ctx.fillStyle = base;
   ctx.fillRect(0, 0, S, S);
@@ -146,6 +161,31 @@ export function facadeTextures(kind: FacadeKind): FacadeTextures {
       ctx.moveTo(i * 128, 0);
       ctx.lineTo(i * 128, S);
       ctx.stroke();
+    }
+  } else if (kind === "panel") {
+    // large precast panels with visible seams and a painted stripe
+    ctx.fillStyle = "rgba(120,124,122,0.25)";
+    for (let i = 0; i < 26; i++) {
+      ctx.fillRect(Math.random() * S, Math.random() * S, rnd(30, 150), rnd(8, 40));
+    }
+    ctx.strokeStyle = "rgba(92,96,94,0.6)";
+    ctx.lineWidth = 3;
+    for (let i = 0; i <= 2; i++) {
+      ctx.beginPath();
+      ctx.moveTo(i * 256, 0);
+      ctx.lineTo(i * 256, S);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(196,142,72,0.55)";
+    ctx.fillRect(0, 220, S, 16);
+  } else if (kind === "tile") {
+    // tiled facade (small squares, warm clay)
+    for (let y = 0; y < S; y += 10) {
+      for (let x = 0; x < S; x += 10) {
+        const g = rnd(0.86, 1.12);
+        ctx.fillStyle = `rgb(${Math.floor(184 * g)},${Math.floor(132 * g)},${Math.floor(94 * g)})`;
+        ctx.fillRect(x + 0.6, y + 0.6, 8.8, 8.8);
+      }
     }
   } else if (kind === "glass") {
     const g = ctx.createLinearGradient(0, 0, S, S);
@@ -313,7 +353,16 @@ export function shopFrontTexture(variant: number) {
   ctx.fillStyle = "rgba(20,20,20,0.75)";
   ctx.font = "700 22px 'Segoe UI', system-ui, sans-serif";
   ctx.textAlign = "center";
-  const names = ["MARKET", "CAFE", "PHARMACY", "BAKERY", "BARBER"];
+  const names = [
+    "МАГАЗИН",
+    "КАФЕ",
+    "АПТЕКА",
+    "ПЕКАРНЯ",
+    "БАРБЕР",
+    "ЦВЕТЫ",
+    "ТАБАК",
+    "ПРОДУКТЫ",
+  ];
   ctx.fillStyle = main;
   ctx.fillText(names[variant % names.length], 128, 40);
 
