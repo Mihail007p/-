@@ -19,6 +19,7 @@ execFileSync(
     "src/input.ts",
     "src/ui/settings.ts",
     "src/game/movement.ts",
+    "src/player.ts",
     "node_modules/@types/three/index.d.ts",
     "--outDir",
     out,
