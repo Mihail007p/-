@@ -2,83 +2,73 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#05060a" />
-    <title>Neon District — открытый город</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23070a12'/><path d='M8 22V10l8 8 8-8v12' stroke='%2322e1ff' stroke-width='3' fill='none'/></svg>" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#8fb6d6" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>Neon District — город</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23243b52'/><path d='M7 24V10l9 7 9-7v14' stroke='%23ffd54a' stroke-width='3' fill='none'/></svg>"
+    />
   </head>
   <body>
-    <div id="app">
-      <canvas id="scene"></canvas>
+    <canvas id="scene"></canvas>
 
-      <div id="hud" class="hud hidden">
-        <div class="hud-top">
-          <div class="panel cash">
-            <span class="label">Наличные</span>
-            <span id="cash" class="value">$0</span>
-          </div>
-          <div class="panel wanted">
-            <span class="label">Розыск</span>
-            <div id="stars" class="stars"></div>
-          </div>
-          <div class="panel clock">
-            <span id="clock" class="value small">23:40</span>
-          </div>
-        </div>
-
-        <div class="hud-left">
-          <div id="objective" class="objective">
-            <div class="objective-title">Свободный режим</div>
-            <div class="objective-text">Сядь в машину и держи город в страхе. Или просто покатайся.</div>
-          </div>
-          <canvas id="minimap" width="200" height="200"></canvas>
-        </div>
-
-        <div class="hud-bottom">
-          <div id="speedo" class="speedo hidden">
-            <div class="speed-ring">
-              <span id="speed" class="speed-value">0</span>
-              <span class="speed-unit">км/ч</span>
-            </div>
-            <div id="gear" class="gear">D</div>
-          </div>
-          <div id="prompt" class="prompt hidden"></div>
-        </div>
-
-        <div id="toast" class="toast"></div>
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+      <div class="minimap-wrap">
+        <canvas id="minimap"></canvas>
+        <div class="compass"><span id="compass">С</span></div>
       </div>
+      <div id="place" class="place">Центральный проспект</div>
+      <div id="stats" class="stats hidden"></div>
+    </div>
 
-      <div id="overlay" class="overlay">
-        <div class="overlay-card">
-          <div class="brand">
-            <span class="brand-mark">ND</span>
-            <div>
-              <h1>Neon District</h1>
-              <p class="brand-sub">открытый город · ночная смена</p>
-            </div>
-          </div>
-          <p class="lead">
-            Дождливый мегаполис, чужие тачки и контракты от людей, которых лучше не знать.
-            Никакой полиции рядом — пока ты не начнёшь.
-          </p>
-          <div class="controls">
-            <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>движение / руль</span></div>
-            <div><kbd>Shift</kbd><span>бег на ногах</span></div>
-            <div><kbd>Space</kbd><span>ручник</span></div>
-            <div><kbd>F</kbd><span>сесть в машину / выйти</span></div>
-            <div><kbd>Мышь</kbd><span>осмотр камеры</span></div>
-            <div><kbd>R</kbd><span>вернуть машину на дорогу</span></div>
-          </div>
-          <button id="start" class="start-btn">Выйти в город</button>
-          <p class="hint">Играбельный прототип v0.1 · наушники рекомендуются</p>
-        </div>
+    <!-- touch controls -->
+    <div id="touch-ui" class="hidden">
+      <div id="look-zone" class="look-zone"></div>
+      <div id="stick" class="stick">
+        <div id="stick-knob" class="stick-knob"></div>
       </div>
+      <button id="run-btn" class="run-btn" aria-label="Бег">RUN</button>
+    </div>
 
-      <div id="loading" class="loading">
-        <div class="loading-bar"><span></span></div>
-        <p>Строим город…</p>
+    <!-- start screen -->
+    <div id="overlay" class="overlay">
+      <div class="card">
+        <div class="title-row">
+          <span class="mark">ND</span>
+          <div>
+            <h1>Neon District</h1>
+            <p class="sub">дневной город · этап 1: мир</p>
+          </div>
+        </div>
+
+        <p class="lead">
+          Ты в центре города. Пока это только мир — кварталы, дворы, парки и улицы,
+          по которым можно ходить и всё рассмотреть. Следующим шагом добавим транспорт и жизнь.
+        </p>
+
+        <div class="controls">
+          <div><b>W A S D</b><span>идти</span></div>
+          <div><b>Shift</b><span>бежать</span></div>
+          <div><b>Мышь</b><span>камера</span></div>
+          <div><b>Колесо</b><span>приближение</span></div>
+        </div>
+
+        <button id="start" class="start">Пойти в город</button>
+        <p class="hint">На телефоне: левый стик — ходьба, правая часть экрана — камера</p>
       </div>
     </div>
+
+    <div id="loading" class="loading">
+      <div class="bar"><span></span></div>
+      <p>Строим город…</p>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
