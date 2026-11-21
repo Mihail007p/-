@@ -183,6 +183,8 @@ export class Player {
       this.shinR.rotation.x = Math.max(0, -c * 0.5 + 0.5) * kneeBend + 0.06;
 
       // arms swing opposite to the legs, elbows bend while running
+      this.armL.rotation.z = THREE.MathUtils.lerp(this.armL.rotation.z, 0.055, Math.min(1, dt * 6));
+      this.armR.rotation.z = THREE.MathUtils.lerp(this.armR.rotation.z, -0.055, Math.min(1, dt * 6));
       this.armL.rotation.x = s * (0.4 + this.runAmount * 0.55);
       this.armR.rotation.x = -s * (0.4 + this.runAmount * 0.55);
       const elbow = 0.18 + this.runAmount * 0.85;
@@ -211,6 +213,9 @@ export class Player {
       for (const limb of [this.armL, this.armR]) {
         limb.rotation.x = THREE.MathUtils.lerp(limb.rotation.x, 0, relax);
       }
+      // idle stance: let the arms fall out from the body, never into it
+      this.armL.rotation.z = THREE.MathUtils.lerp(this.armL.rotation.z, 0.055, relax);
+      this.armR.rotation.z = THREE.MathUtils.lerp(this.armR.rotation.z, -0.055, relax);
       this.foreL.rotation.x = THREE.MathUtils.lerp(this.foreL.rotation.x, -0.12, relax);
       this.foreR.rotation.x = THREE.MathUtils.lerp(this.foreR.rotation.x, -0.12, relax);
 
