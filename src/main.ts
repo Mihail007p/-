@@ -6,6 +6,7 @@ import { Input } from "./input";
 import { Hud } from "./ui/hud";
 import { CameraRig } from "./camera";
 import { Settings } from "./ui/settings";
+import { wishDirection } from "./game/movement";
 
 /** Detect a mobile GPU budget and scale quality down accordingly. */
 function isMobile() {
@@ -100,9 +101,8 @@ function frame() {
   const dt = Math.min(clock.getDelta(), 0.05);
 
   const axis = input.moveAxis();
-  const forward = new THREE.Vector3(-Math.sin(rig.yaw), 0, -Math.cos(rig.yaw));
-  const right = new THREE.Vector3(forward.z, 0, -forward.x);
-  wish.set(0, 0, 0).addScaledVector(forward, axis.y).addScaledVector(right, axis.x);
+  // stick/keyboard -> world direction (unit tested in tests/movement.mjs)
+  wishDirection(rig.yaw, axis, wish);
   const wantsMove = wish.lengthSq() > 0.001;
   if (wantsMove) wish.normalize();
 

@@ -104,7 +104,7 @@ function load(): CameraSettings {
     if (!raw) return { ...DEFAULT_SETTINGS };
     const parsed = JSON.parse(raw) as Partial<CameraSettings>;
     return {
-      sensitivity: clamp(Number(parsed.sensitivity ?? DEFAULT_SETTINGS.sensitivity), 0.3, 2.4),
+      sensitivity: clamp(Number(parsed.sensitivity ?? DEFAULT_SETTINGS.sensitivity), 0.3, 4),
       invertY: Boolean(parsed.invertY),
       autoCenter: parsed.autoCenter ?? DEFAULT_SETTINGS.autoCenter,
     };

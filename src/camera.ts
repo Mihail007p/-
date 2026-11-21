@@ -19,7 +19,8 @@ export type CameraSettings = {
 };
 
 export const DEFAULT_SETTINGS: CameraSettings = {
-  sensitivity: 1,
+  // 2x was picked by the player as comfortable: base 0.2 deg/px * 2 = 0.4 deg/px
+  sensitivity: 2,
   invertY: false,
   autoCenter: true,
 };

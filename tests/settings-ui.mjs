@@ -56,7 +56,7 @@ check("low sensitivity accepted", settings.current.sensitivity === 0.5, `= ${set
 check("sensitivity persisted", localStorage.getItem("nd.camera.v1")?.includes("0.5"));
 
 click(document.getElementById("settings-reset"));
-check("reset restores defaults", settings.current.sensitivity === 1);
+check("reset restores defaults", settings.current.sensitivity === 2, `= ${settings.current.sensitivity}×`);
 check("reset closes nothing / panel still usable", panel.classList.contains("open"));
 
 // Escape key path used by main.ts
