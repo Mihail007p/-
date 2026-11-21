@@ -7,15 +7,25 @@
 
 ## Играть
 
-**Способ 1 — без сервера (проще всего).** Скачай файл
-[NeonDistrict.html](https://github.com/Mihail007p/-/releases/download/v0.1.0/NeonDistrict.html)
-и открой двойным кликом в Chrome / Edge / Firefox. Вся игра, все текстуры и звук — внутри
-одного файла, интернет и установка не нужны.
+**Способ 1 — скачать файл (проверено).**
+Открой страницу файла и нажми **Download raw file** (иконка ↓ справа):
+<https://github.com/Mihail007p/-/blob/v0.2.0/NeonDistrict.html>
 
-**Способ 2 — из репозитория.** Файл `NeonDistrict.html` в корне и `docs/index.html` — та же
-сборка; их можно открыть локально или положить на любой статический хостинг.
+Затем открой скачанный `NeonDistrict.html` двойным кликом в Chrome / Edge / Firefox.
+Вся игра внутри одного файла: ни сервер, ни интернет после скачивания не нужны.
+
+**Способ 2 — скачать архив репозитория (проверено, код 200).**
+<https://codeload.github.com/Mihail007p/-/zip/refs/tags/v0.2.0>
+Внутри архива: `--0.2.0/NeonDistrict.html` — это и есть игра.
 
 **Способ 3 — разработка.** `npm run dev` → `http://localhost:5173`.
+
+### Почему нет ссылки вида `*.github.io`
+
+GitHub Pages включается только вручную: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+Токен песочницы не имеет прав на настройки репозитория (API и Actions отвечают `403 Resource not accessible by integration`),
+поэтому включить Pages автоматически невозможно. После ручного включения workflow
+`.github/workflows/deploy-pages.yml` будет сам собирать и публиковать игру на `https://mihail007p.github.io/-/`.
 
 ## Запуск
 
