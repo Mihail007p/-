@@ -74,24 +74,20 @@ resize();
 const settings = new Settings();
 settings.onChange = (s) => rig.setSettings(s);
 rig.setSettings(settings.current);
-// Delegated on the document in the capture phase: the canvas and the touch
-// layer sit above the HUD, so a listener on the button alone can be swallowed
-// on some phones.
-document.addEventListener(
-  "click",
-  (e) => {
-    const target = e.target as HTMLElement | null;
-    if (target?.closest("#settings-btn")) {
-      e.preventDefault();
-      e.stopPropagation();
-      settings.toggle();
-    } else if (settings.isOpen && !target?.closest("#settings-panel")) {
-      // tapping anywhere else closes the panel
-      settings.hide();
-    }
-  },
-  true
-);
+settings.bind();
+
+startBtn.addEventListener("click", start);
+window.addEventListener("keydown", (e) => {
+  if (e.code === "Enter" && !overlay.classList.contains("hidden")) start();
+  // C or Home: put the camera back behind the character
+  if (e.code === "KeyC" || e.code === "Home") input.recenterRequested = true;
+  if (e.code === "Escape") settings.hide();
+});
+
+loading.classList.add("done");
+
+// expose for debugging
+(window as unknown as { game: unknown }).game = { scene, renderer, world, player, camera, rig };
 
 // --------------------------------------------------------------------- loop
 const clock = new THREE.Clock();
@@ -103,7 +99,6 @@ function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.05);
 
-  // movement relative to where the camera looks
   const axis = input.moveAxis();
   const forward = new THREE.Vector3(-Math.sin(rig.yaw), 0, -Math.cos(rig.yaw));
   const right = new THREE.Vector3(forward.z, 0, -forward.x);
@@ -111,11 +106,10 @@ function frame() {
   const wantsMove = wish.lengthSq() > 0.001;
   if (wantsMove) wish.normalize();
 
-  const speed = input.sprint ? 6.2 : 3.4;
   player.update(
     dt,
     wish,
-    wantsMove ? speed : 0,
+    wantsMove ? (input.sprint ? 6.2 : 3.4) : 0,
     world.colliders,
     world.blockers,
     WORLD_LIMITS.playable
@@ -146,16 +140,3 @@ function start() {
   hud.show();
   frame();
 }
-
-startBtn.addEventListener("click", start);
-window.addEventListener("keydown", (e) => {
-  if (e.code === "Enter" && !overlay.classList.contains("hidden")) start();
-  // C or Home: put the camera back behind the character
-  if (e.code === "KeyC" || e.code === "Home") input.recenterRequested = true;
-  if (e.code === "Escape") settings.hide();
-});
-
-loading.classList.add("done");
-
-// expose for debugging
-(window as unknown as { game: unknown }).game = { scene, renderer, world, player, camera, rig };

@@ -52,6 +52,28 @@ export class Settings {
     document.getElementById("settings-close")!.addEventListener("click", () => this.hide());
   }
 
+  /**
+   * Wires the gear button. The listener sits on the document in the capture
+   * phase because the WebGL canvas and the touch layer are stacked above the
+   * HUD, and on some phones a listener on the button alone never fires.
+   */
+  bind() {
+    document.addEventListener(
+      "click",
+      (e) => {
+        const target = e.target as HTMLElement | null;
+        if (target?.closest("#settings-btn")) {
+          e.preventDefault();
+          e.stopPropagation();
+          this.toggle();
+        } else if (this.open && !target?.closest("#settings-panel")) {
+          this.hide();
+        }
+      },
+      true
+    );
+  }
+
   private commit() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(this.current));
     this.onChange(this.current);

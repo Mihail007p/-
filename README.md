@@ -51,7 +51,7 @@
 npm install
 npm run dev         # http://localhost:5173
 npm run typecheck   # tsc --noEmit
-npm run test:camera # тесты камеры (jsdom, 12 проверок)
+npm run test:camera # 22 проверки: камера + настройки (jsdom, реальные события)
 npm run build       # → docs/index.html (один файл); копия кладётся в NeonDistrict.html
 ```
 

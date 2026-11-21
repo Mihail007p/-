@@ -17,6 +17,7 @@ execFileSync(
     "tsc",
     "src/camera.ts",
     "src/input.ts",
+    "src/ui/settings.ts",
     "--outDir",
     out,
     "--module",
@@ -32,8 +33,11 @@ execFileSync(
   { cwd: root, stdio: "inherit" }
 );
 
+// node needs explicit .js extensions on relative imports of the compiled files
+execFileSync("node", [`${root}tests/rewrite-imports.mjs`, out], { cwd: root, stdio: "inherit" });
+
 const files = readdirSync(new URL(".", import.meta.url))
-  .filter((f) => f.endsWith(".mjs") && f !== "setup.mjs")
+  .filter((f) => f.endsWith(".mjs") && f !== "setup.mjs" && f !== "rewrite-imports.mjs")
   .sort();
 
 let failed = 0;
