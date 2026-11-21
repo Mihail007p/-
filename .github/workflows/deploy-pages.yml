@@ -1,8 +1,10 @@
 name: Deploy game to GitHub Pages
 
+# Runs only after GitHub Pages is enabled once by hand:
+# Settings -> Pages -> Build and deployment -> Source: GitHub Actions
 on:
   push:
-    branches: ["arena/818faa12-repo", "main"]
+    branches: ["main"]
   workflow_dispatch:
 
 permissions:
