@@ -61,6 +61,10 @@ export class Settings {
     this.open ? this.hide() : this.show();
   }
 
+  get isOpen() {
+    return this.open;
+  }
+
   show() {
     this.open = true;
     this.panel.classList.add("open");

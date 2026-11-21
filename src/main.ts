@@ -74,7 +74,24 @@ resize();
 const settings = new Settings();
 settings.onChange = (s) => rig.setSettings(s);
 rig.setSettings(settings.current);
-document.getElementById("settings-btn")?.addEventListener("click", () => settings.toggle());
+// Delegated on the document in the capture phase: the canvas and the touch
+// layer sit above the HUD, so a listener on the button alone can be swallowed
+// on some phones.
+document.addEventListener(
+  "click",
+  (e) => {
+    const target = e.target as HTMLElement | null;
+    if (target?.closest("#settings-btn")) {
+      e.preventDefault();
+      e.stopPropagation();
+      settings.toggle();
+    } else if (settings.isOpen && !target?.closest("#settings-panel")) {
+      // tapping anywhere else closes the panel
+      settings.hide();
+    }
+  },
+  true
+);
 
 // --------------------------------------------------------------------- loop
 const clock = new THREE.Clock();
@@ -135,6 +152,7 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "Enter" && !overlay.classList.contains("hidden")) start();
   // C or Home: put the camera back behind the character
   if (e.code === "KeyC" || e.code === "Home") input.recenterRequested = true;
+  if (e.code === "Escape") settings.hide();
 });
 
 loading.classList.add("done");

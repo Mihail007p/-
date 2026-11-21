@@ -10,7 +10,8 @@
     "build:single": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "typecheck": "tsc --noEmit",
-    "test:camera": "node tests/setup.mjs"
+    "test:camera": "node tests/setup.mjs",
+    "publish": "node scripts/publish.mjs"
   },
   "dependencies": {
     "three": "0.187.0"

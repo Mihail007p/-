@@ -1,0 +1,40 @@
+name: Publish game to GitHub Pages
+
+# Rebuilds the single-file game and force-pushes it to the gh-pages branch.
+# That branch is what https://mihail007p.github.io/-/ serves.
+on:
+  push:
+    branches: ["arena/818faa12-repo", "main"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run test:camera
+
+      - run: npm run build
+
+      - name: Push build to gh-pages
+        run: |
+          mkdir -p /tmp/site
+          cp docs/index.html /tmp/site/index.html
+          cd /tmp/site
+          git init -q
+          git checkout -q -b gh-pages
+          git add index.html
+          git -c user.email="actions@github.com" -c user.name="github-actions" \
+              commit -q -m "deploy: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages

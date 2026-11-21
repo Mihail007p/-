@@ -8,12 +8,17 @@
 
 ## Играть
 
-1. Открой <https://github.com/Mihail007p/-/blob/arena/818faa12-repo/NeonDistrict.html>
-   и нажми **Download raw file** (иконка ↓ справа).
-2. Открой скачанный файл двойным кликом в Chrome / Edge / Firefox (на телефоне — любой браузер).
+**Постоянная ссылка (нажал — и игра пошла, ничего не скачивая):**
+<https://mihail007p.github.io/-/>
 
-Архив с игрой: <https://codeload.github.com/Mihail007p/-/zip/refs/heads/arena/818faa12-repo>
-(внутри `NeonDistrict.html`).
+Обновляется автоматически при каждом пуше в ветку (workflow `publish-pages.yml` собирает
+игру и выкладывает сборку в ветку `gh-pages`, откуда её отдаёт GitHub Pages).
+
+Запасные варианты:
+
+- скачать файл: <https://github.com/Mihail007p/-/blob/arena/818faa12-repo/NeonDistrict.html>
+  (кнопка **Download raw file**) и открыть двойным кликом;
+- архив: <https://codeload.github.com/Mihail007p/-/zip/refs/heads/arena/818faa12-repo>
 
 ## Управление
 

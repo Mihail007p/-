@@ -41,8 +41,10 @@ body {
 #hud {
   position: fixed;
   inset: 0;
+  /* above the touch layer (#touch-ui is 6) so the gear button and the panel
+     always receive taps; everything except the panel is pointer-events:none */
   pointer-events: none;
-  z-index: 5;
+  z-index: 7;
 }
 
 .minimap-wrap {
@@ -114,6 +116,8 @@ body {
 .look-zone {
   position: absolute;
   inset: 0 0 0 45%;
+  /* keep clear of the settings button in the top-right corner */
+  clip-path: inset(84px 84px 0 0);
   pointer-events: auto;
   touch-action: none;
 }
@@ -354,6 +358,10 @@ body:not(.touch) .run-btn {
 /* --------------------------------------------------------- settings panel */
 .settings-btn {
   position: absolute;
+  z-index: 3;
+  -webkit-appearance: none;
+  appearance: none;
+  touch-action: manipulation;
   left: max(14px, env(safe-area-inset-left));
   bottom: max(16px, env(safe-area-inset-bottom));
   width: 44px;
@@ -371,6 +379,7 @@ body:not(.touch) .run-btn {
 
 .settings-panel {
   position: absolute;
+  z-index: 4;
   left: max(14px, env(safe-area-inset-left));
   bottom: calc(max(16px, env(safe-area-inset-bottom)) + 54px);
   width: min(300px, calc(100vw - 28px));
@@ -386,10 +395,19 @@ body:not(.touch) .run-btn {
   transition: opacity 0.18s, transform 0.18s;
 }
 
+.settings-btn:active {
+  transform: scale(0.94);
+}
+
 .settings-panel.open {
   opacity: 1;
   transform: none;
   pointer-events: auto;
+}
+
+.settings-panel button,
+.settings-panel input {
+  touch-action: manipulation;
 }
 
 .settings-head {
@@ -470,7 +488,10 @@ body:not(.touch) .run-btn {
     left: auto;
     right: max(16px, env(safe-area-inset-right));
     bottom: auto;
-    top: calc(max(14px, env(safe-area-inset-top)) + 178px);
+    top: calc(max(14px, env(safe-area-inset-top)) + 182px);
+    width: 52px;
+    height: 52px;
+    font-size: 22px;
   }
   .settings-panel {
     left: auto;
