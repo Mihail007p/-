@@ -431,21 +431,22 @@ function headTexture(pal = CHARACTER_PALETTE): THREE.Texture {
   ctx.fillRect(0, 0, W, H);
 
   // warm face, cool sides
-  const glow = ctx.createRadialGradient(cx, H * 0.55, 10, cx, H * 0.55, W * 0.24);
-  glow.addColorStop(0, "rgba(255,216,190,0.30)");
-  glow.addColorStop(0.6, "rgba(255,216,190,0.07)");
-  glow.addColorStop(1, "rgba(78,46,36,0.34)");
+  const glow = ctx.createRadialGradient(cx, H * 0.5, 20, cx, H * 0.5, W * 0.33);
+  glow.addColorStop(0, "rgba(255,216,190,0.26)");
+  glow.addColorStop(0.55, "rgba(255,216,190,0.06)");
+  glow.addColorStop(0.85, "rgba(120,80,64,0.1)");
+  glow.addColorStop(1, "rgba(120,80,64,0.16)");
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, W, H);
 
   // silhouette height fraction → equirect texture fraction (top = 0)
   const hf = (h: number) => Math.acos(Math.max(-1, Math.min(1, 1 - 2 * Math.max(0, Math.min(1, h))))) / Math.PI;
   const HAIRLINE = hf(0.26); // front hairline, 26 % down the skull
-  const EAR_TOP = hf(0.5);
-  const EYE = hf(0.515); // eyes sit on the skull's midline
+  const EAR_TOP = hf(0.36);
+  const EYE = hf(0.5); // eyes sit on the skull's midline
   const NOSE = hf(0.63);
-  const MOUTH = hf(0.7);
-  const CHIN = hf(0.999);
+  const MOUTH = hf(0.715);
+  const CHIN = hf(0.985);
 
   // hair: crown down to the hairline, longer over the ears, a short back
   for (let y = 0; y < H; y++) {
@@ -455,7 +456,7 @@ function headTexture(pal = CHARACTER_PALETTE): THREE.Texture {
       if (du > 0.5) du = 1 - du;
       // 0.84 halfway round, 1.0 at the front and back
       const front = Math.cos(Math.min(Math.PI, du * 6.4)) * 0.5 + 0.5;
-      const limit = HAIRLINE + (EAR_TOP - HAIRLINE) * Math.pow(1 - front, 0.7);
+      const limit = HAIRLINE + (EAR_TOP - HAIRLINE) * Math.pow(1 - front, 0.85);
       if (v < limit) {
         const s1 = 0.5 + 0.5 * Math.sin((x / W) * 220 + v * 26);
         const s2 = 0.5 + 0.5 * Math.sin((x / W) * 71 + v * 96);
@@ -473,7 +474,7 @@ function headTexture(pal = CHARACTER_PALETTE): THREE.Texture {
 
   // ---- facial features
   const eyeY = EYE * H;
-  const eyeDX = W * 0.054;
+  const eyeDX = W * 0.047;
   for (const sx of [-1, 1]) {
     const ex = cx + sx * eyeDX;
     const sock = ctx.createRadialGradient(ex, eyeY, 2, ex, eyeY, W * 0.06);
@@ -506,16 +507,24 @@ function headTexture(pal = CHARACTER_PALETTE): THREE.Texture {
     ctx.moveTo(ex - 10.5, eyeY + 5.6);
     ctx.quadraticCurveTo(ex, eyeY + 8.8, ex + 10.5, eyeY + 5.6);
     ctx.stroke();
-    // brow: angled, thinner toward the temples
-    ctx.strokeStyle = "rgba(38,28,22,0.92)";
+    // brow: one tapered stroke, thick at the inner end
+    ctx.strokeStyle = "rgba(40,29,22,0.9)";
     ctx.lineCap = "round";
-    for (let i = 0; i < 3; i++) {
-      ctx.lineWidth = 2.9 - i * 0.7;
-      ctx.beginPath();
-      ctx.moveTo(ex - sx * 20, eyeY - H * 0.042 + i * 2.4);
-      ctx.quadraticCurveTo(ex, eyeY - H * 0.058 + i * 2.2, ex + sx * 19, eyeY - H * 0.048 + i * 2.4);
-      ctx.stroke();
-    }
+    const bx0 = ex - sx * 19;
+    const bx1 = ex + sx * 18;
+    const by0 = eyeY - H * 0.055;
+    const by1 = eyeY - H * 0.038;
+    ctx.lineWidth = 5.2;
+    ctx.beginPath();
+    ctx.moveTo(bx0, by0 + 2.2);
+    ctx.quadraticCurveTo((bx0 + bx1) / 2, eyeY - H * 0.075, bx1, by1);
+    ctx.stroke();
+    ctx.lineWidth = 2.6;
+    ctx.strokeStyle = "rgba(40,29,22,0.7)";
+    ctx.beginPath();
+    ctx.moveTo(bx1, by1);
+    ctx.lineTo(bx1 - sx * 6, by1 - 1.4);
+    ctx.stroke();
   }
 
   // nose: bridge highlight, tip shadow, nostrils, wings
@@ -552,17 +561,20 @@ function headTexture(pal = CHARACTER_PALETTE): THREE.Texture {
   // cheek shading and a hint of a jaw shadow (no beard)
   for (const sx of [-1, 1]) {
     const ch = ctx.createRadialGradient(cx + sx * W * 0.075, eyeY + H * 0.1, 4, cx + sx * W * 0.075, eyeY + H * 0.1, W * 0.055);
-    ch.addColorStop(0, "rgba(150,96,78,0.14)");
+    ch.addColorStop(0, "rgba(150,96,78,0.08)");
     ch.addColorStop(1, "rgba(150,96,78,0)");
     ctx.fillStyle = ch;
     ctx.fillRect(0, 0, W, H);
   }
+  // jaw shading: a soft vertical gradient at the chin, no hard band
   for (let i = 0; i < 3400; i++) {
     const x = Math.random() * W;
-    const y = H * (CHIN - 0.16 + Math.random() * 0.16);
-    const du = Math.abs(x - cx) / (W * 0.14);
+    const yTop = H * (CHIN - 0.18);
+    const y = yTop + Math.random() * (H - yTop);
+    const du = Math.abs(x - cx) / (W * 0.15);
     if (du > 1) continue;
-    ctx.fillStyle = `rgba(92,62,50,${(0.01 + Math.random() * 0.022) * (1 - du * 0.6)})`;
+    const fadeIn = Math.min(1, (y - yTop) / (H * 0.06)); // no edge at the top
+    ctx.fillStyle = `rgba(96,66,54,${(0.012 + Math.random() * 0.02) * fadeIn * (1 - du * 0.5)})`;
     ctx.fillRect(x, y, 1.3, 1.3);
   }
 
@@ -584,7 +596,7 @@ function torsoTexture(pal = CHARACTER_PALETTE): THREE.Texture {
   const cx = 0.25 * W;
   // body v → canvas row
   const V0 = 0.512;
-  const V1 = 0.848;
+  const V1 = 0.842;
   const yy = (v: number) => (1 - (v - V0) / (V1 - V0)) * H;
   const band = (v0: number, v1: number, color: string) => {
     ctx.fillStyle = color;
@@ -597,7 +609,7 @@ function torsoTexture(pal = CHARACTER_PALETTE): THREE.Texture {
   // the jacket hem is at v 0.552, i.e. 0.98 m — just over the hips
   band(0.812, 0.826, hex(pal.jacketDark)); // collar edge only
   ctx.fillStyle = '#e7c0a9'; // bare neck above the collar, lit like the face
-  ctx.fillRect(0, yy(0.848), W, yy(0.826) - yy(0.848));
+  ctx.fillRect(0, yy(0.842), W, yy(0.826) - yy(0.842));
 
   // cloth noise on the jacket
   for (let i = 0; i < 26000; i++) {
@@ -636,9 +648,12 @@ function torsoTexture(pal = CHARACTER_PALETTE): THREE.Texture {
   }
   // jacket zip line + hem + pockets
   ctx.fillRect(0, yy(0.555), W, 5);
-  for (const u of [0.115, 0.385]) {
-    ctx.fillStyle = "rgba(0,0,0,0.3)";
-    ctx.fillRect(u * W, yy(0.78), 0.05 * W, 3);
+  for (const u of [0.155, 0.345]) {
+    ctx.fillStyle = "rgba(0,0,0,0.16)";
+    ctx.fillRect(u * W, yy(0.752), 0.048 * W, 2);
+    ctx.fillStyle = "rgba(0,0,0,0.08)";
+    ctx.fillRect(u * W, yy(0.752) + 2, 1.5, yy(0.705) - yy(0.752));
+    ctx.fillRect((u + 0.048) * W - 1.5, yy(0.752) + 2, 1.5, yy(0.705) - yy(0.752));
   }
   // belt buckle
   ctx.fillStyle = hex(pal.buckle);
@@ -747,27 +762,29 @@ export function createCharacter(
   // neck seam, no gap at the collar and no blob-on-a-stick silhouette.
   const torsoRings: Ring[] = [];
   // [body v, half-width m, half-depth m] — a 1.76 m adult male
+  // Real shoulder width comes from torso + deltoid, not from a flare in the
+  // torso itself: a flare reads as a padded/pagoda shoulder.
   const torsoKeys: [number, number, number][] = [
-    [0.512, 0.128, 0.094], // hem, sits over the hips (cap does the rest)
+    [0.512, 0.128, 0.094], // hem, sits over the hips
     [0.545, 0.142, 0.099], // hip
-    [0.57, 0.152, 0.104], // waist
-    [0.62, 0.146, 0.108], // lower ribs
-    [0.68, 0.154, 0.116], // chest
-    [0.74, 0.152, 0.116], // upper chest
-    [0.772, 0.188, 0.117], // shoulder point (0.376 m across = 0.21 H)
-    [0.784, 0.181, 0.115],
-    [0.788, 0.163, 0.109],
-    [0.796, 0.12, 0.096],
-    [0.804, 0.09, 0.083],
-    [0.81, 0.07, 0.072],
-    [0.816, 0.064, 0.067], // neck base
-    [0.835, 0.06, 0.064], // neck
-    [0.848, 0.062, 0.066], // top of the neck
+    [0.57, 0.148, 0.102], // waist
+    [0.62, 0.146, 0.106], // lower ribs
+    [0.68, 0.152, 0.112], // chest
+    [0.73, 0.157, 0.113], // upper chest / armpit line
+    [0.755, 0.166, 0.11],
+    [0.773, 0.196, 0.104], // shoulder: the torso carries the width
+    [0.789, 0.176, 0.098],
+    [0.8, 0.134, 0.088],
+    [0.81, 0.098, 0.081],
+    [0.818, 0.078, 0.074],
+    [0.82, 0.068, 0.07], // neck base
+    [0.832, 0.062, 0.066], // neck
+    [0.842, 0.064, 0.068], // top of the neck
   ];
   const TORSO_SEG = 96;
   for (let i = 0; i < TORSO_SEG; i++) {
     const t = i / (TORSO_SEG - 1);
-    const v = 0.512 + t * (0.848 - 0.512);
+    const v = 0.512 + t * (0.842 - 0.512);
     // interpolate the key table
     let a = torsoKeys[0];
     let b = torsoKeys[torsoKeys.length - 1];
@@ -845,30 +862,40 @@ export function createCharacter(
     // multiplicative, so no face can fold inside out
     const pos = headGeo.attributes.position;
     const v = new THREE.Vector3();
+    const smooth = (t: number) => {
+      const k = Math.max(0, Math.min(1, t));
+      return k * k * (3 - 2 * k);
+    };
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i);
-      const ny = v.y / headR;
-      // widen the lower face so the head ends in a jaw, not a cone
-      const widen = 1 + 0.34 * Math.pow(Math.max(0, -ny - 0.42) / 0.58, 1.5);
-      const taper = 1 - 0.42 * Math.pow(Math.max(0, -ny - 0.78) / 0.22, 1.5);
-      const cheek = 1 + 0.06 * Math.exp(-Math.pow((ny + 0.3) / 0.25, 2));
-      const chin = 1 + 0.1 * Math.exp(-Math.pow((ny + 0.45) / 0.3, 2));
-      v.x *= widen * cheek * taper;
-      v.z *= widen * cheek * chin * taper * (v.z < 0 ? 0.94 : 1);
+      const ny = v.y / headR; // -1 chin … +1 crown
+      // One continuous profile: the skull is widest at the temples, the jaw
+      // narrows without a crease, and the chin comes forward. Smoothstep keeps
+      // the first derivative continuous, so no shading band appears.
+      const x = smooth((-ny - 0.06) / 0.94); // 0 at the temples, 1 at the chin
+      // flatten the cheek plane (|x|^1 inside the square) so the jaw is a
+      // plane, not a cone — that is what reads as an adult male face
+      const jaw = 1 - 0.5 * x * x;
+      const flat = 1 - 0.1 * smooth((-ny - 0.25) / 0.5);
+      const cheek = 1 + 0.05 * Math.sin(Math.PI * smooth((-ny + 0.15) / 0.7));
+      const chinPush = 1 + 0.16 * smooth((-ny - 0.42) / 0.5);
+      const occiput = v.z < 0 ? 1 - 0.05 * smooth((0.2 - ny) / 0.8) : 1;
+      v.x *= jaw * cheek * flat;
+      v.z *= jaw * cheek * chinPush * occiput;
       pos.setXYZ(i, v.x, v.y, v.z);
     }
     headGeo.computeVertexNormals();
   }
   const headMesh = new THREE.Mesh(headGeo, headMat);
-  headMesh.scale.set(0.745, 1.04, 0.9);
-  headMesh.position.y = y(0.92) - y(0.862);
+  headMesh.scale.set(0.73, 1.16, 0.9);
+  headMesh.position.y = y(0.915) - y(0.862);
   head.add(headMesh);
 
   // ears
   for (const side of [-1, 1] as const) {
     const ear = new THREE.Mesh(new THREE.SphereGeometry(0.019, 12, 10), neckMat);
     ear.scale.set(0.36, 1.05, 0.8);
-    ear.position.set(side * 0.087, y(0.916) - y(0.862), -0.014);
+    ear.position.set(side * 0.086, y(0.909) - y(0.862), -0.022);
     ear.rotation.y = side * 0.3;
     head.add(ear);
   }
@@ -1000,9 +1027,9 @@ export function createCharacter(
   const armParts: { upper: THREE.Object3D; fore: THREE.Object3D }[] = [];
 
   for (const side of [-1, 1] as const) {
-    const shoulderX = 0.118;
+    const shoulderX = 0.132;
     const armPivot = new THREE.Object3D();
-    armPivot.position.set(side * shoulderX, y(0.776), 0);
+    armPivot.position.set(side * shoulderX, y(0.766), 0);
     armPivot.rotation.z = side * 0.055; // a few degrees out from the body
     model.add(armPivot);
 
@@ -1010,12 +1037,14 @@ export function createCharacter(
     const upperRings: Ring[] = [];
     // the sleeve starts at the joint (inside the torso shell) and its widest
     // point is 3 cm down the arm: that is what makes the shoulder slope
-    upperRings.push({ y: 0.055, rx: 0.012, rz: 0.012, v: 0.8 }); // dome tip, hidden
-    upperRings.push({ y: 0.04, rx: 0.03, rz: 0.029, v: 0.79 });
-    upperRings.push({ y: 0.022, rx: 0.048, rz: 0.046, v: 0.783 });
-    for (let i = 0; i < 18; i++) {
+    // the sleeve starts inside the torso and swells into the deltoid, so the
+    // shoulder is one continuous surface instead of a ball stuck on a box
+    upperRings.push({ y: 0.014, rx: 0.016, rz: 0.016, v: 0.783 }); // hidden
+    upperRings.push({ y: 0.004, rx: 0.04, rz: 0.038, v: 0.777 });
+    upperRings.push({ y: -0.012, rx: 0.056, rz: 0.052, v: 0.771 });
+    for (let i = 1; i < 18; i++) {
       const t = i / 17;
-      const r = 0.062 - 0.012 * t * t; // deltoid tapering to the elbow
+      const r = 0.062 - 0.011 * t * t; // deltoid tapering to the elbow
       upperRings.push({ y: -t * upperLen, rx: r, rz: r * 0.95, v: 0.772 - t * 0.12 });
     }
     const upperV = (yy: number) => (y(0.775) + yy) / height;

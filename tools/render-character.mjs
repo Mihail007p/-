@@ -155,6 +155,11 @@ rig.model.traverse((o) => {
   // map is present → approximate the fabric albedo, which is already in the base colour
   const mw = mesh.matrixWorld;
   const normalMatrix = new THREE.Matrix3().getNormalMatrix(mw);
+  const nrm = geom.attributes.normal;
+  const vn = (i) => {
+    const vec = new THREE.Vector3().fromBufferAttribute(nrm, i).applyMatrix3(normalMatrix).normalize();
+    return vec;
+  };
 
   const count = index ? index.count : pos.count;
   for (let i = 0; i < count; i += 3) {
@@ -171,10 +176,15 @@ rig.model.traverse((o) => {
     // backface cull in view space (camera looks along -Z from +Z)
     if (n.z <= 0.02) continue;
 
-    const lam = Math.max(0, n.dot(light));
-    const rim = Math.max(0, n.dot(fill)) * 0.25;
-    const amb = 0.34;
-    const shade = Math.min(1.35, amb + lam * 0.85 + rim);
+    const shadeAt = (nn) => {
+      const lam = Math.max(0, nn.dot(light));
+      const rim = Math.max(0, nn.dot(fill)) * 0.25;
+      return Math.min(1.35, 0.34 + lam * 0.85 + rim);
+    };
+    const na = nrm ? vn(ia) : n;
+    const nb = nrm ? vn(ib) : n;
+    const nc = nrm ? vn(ic) : n;
+    const shade = shadeAt(n);
     const ua = uv ? uv.getX(ia) : 0, va = uv ? uv.getY(ia) : 0;
     const ub = uv ? uv.getX(ib) : 0, vb = uv ? uv.getY(ib) : 0;
     const uc = uv ? uv.getX(ic) : 0, vc = uv ? uv.getY(ic) : 0;
@@ -229,10 +239,12 @@ rig.model.traverse((o) => {
           cg = (d[ti + 1] / 255) * kG;
           cb = (d[ti + 2] / 255) * kB;
         }
+        // Gouraud: blend the three vertex shades through the barycentrics
+        const sh = w0 * shadeAt(na) + w1 * shadeAt(nb) + w2 * shadeAt(nc);
         const o = idx * 3;
-        img[o] = Math.min(255, cr * 255 * shade);
-        img[o + 1] = Math.min(255, cg * 255 * shade);
-        img[o + 2] = Math.min(255, cb * 255 * shade);
+        img[o] = Math.min(255, cr * 255 * sh);
+        img[o + 1] = Math.min(255, cg * 255 * sh);
+        img[o + 2] = Math.min(255, cb * 255 * sh);
       }
     }
   }
