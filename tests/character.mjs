@@ -10,7 +10,29 @@ globalThis.window = dom.window;
 globalThis.document = dom.window.document;
 globalThis.performance = performance;
 
+
+// jsdom has no 2D canvas: give it a no-op context so the procedural fabric and
+// face textures can be generated (the geometry is what we test, not the pixels).
+const ctxStub = () => ({
+  canvas: {},
+  fillStyle: "", strokeStyle: "", lineWidth: 1, lineCap: "", globalAlpha: 1, font: "",
+  fillRect() {}, strokeRect() {}, clearRect() {}, beginPath() {}, closePath() {},
+  moveTo() {}, lineTo() {}, arc() {}, ellipse() {}, quadraticCurveTo() {},
+  bezierCurveTo() {}, fill() {}, stroke() {}, save() {}, restore() {},
+  translate() {}, rotate() {}, scale() {}, drawImage() {},
+  createLinearGradient: () => ({ addColorStop() {} }),
+  createRadialGradient: () => ({ addColorStop() {} }),
+  createPattern: () => null,
+  getImageData: () => ({ data: new Uint8ClampedArray(4) }),
+  putImageData() {},
+  measureText: () => ({ width: 0 }),
+  fillText() {}, strokeText() {},
+});
+dom.window.HTMLCanvasElement.prototype.getContext = () => ctxStub();
+globalThis.HTMLCanvasElement = dom.window.HTMLCanvasElement;
+
 const { Player } = await import("../.test-build/player.js");
+const { CHARACTER_PALETTE } = await import("../.test-build/character/model.js");
 
 let fails = 0;
 const check = (name, ok, info = "") => {

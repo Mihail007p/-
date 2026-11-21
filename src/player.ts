@@ -1,29 +1,33 @@
 import * as THREE from "three";
 import type { Collider } from "./world/world";
+import { createCharacter } from "./character/model";
 
 /**
  * Third-person character.
  *
- * Built from tapered primitives instead of boxes: the silhouette reads as a
- * person at a distance, with a two-segment walk cycle (thigh + shin, upper arm +
- * forearm), a neck, shoulders, a jaw, ears, hair and clothing that reacts to
- * speed (jacket sway, head bob, lean into the run).
- *
- * ~1.78 m tall; all limbs pivot at anatomically sensible heights.
+ * The figure itself is built in `src/character/model.ts` from measurements taken
+ * off the concept illustration (`art/character.png`): 1.76 m tall, real joint
+ * heights, textured denim/cotton/leather and a painted face. This class only
+ * moves and animates it — physics, facing, and a two-segment walk cycle.
  */
 export class Player {
   group = new THREE.Group();
   private model = new THREE.Group();
 
+  height: number;
+  palette: Record<string, number>;
+
   // limb chains
-  private thighL = new THREE.Object3D();
-  private thighR = new THREE.Object3D();
-  private shinL = new THREE.Object3D();
-  private shinR = new THREE.Object3D();
-  private armL = new THREE.Object3D();
-  private armR = new THREE.Object3D();
-  private foreL = new THREE.Object3D();
-  private foreR = new THREE.Object3D();
+  private thighL: THREE.Object3D;
+  private thighR: THREE.Object3D;
+  private shinL: THREE.Object3D;
+  private shinR: THREE.Object3D;
+  private armL: THREE.Object3D;
+  private armR: THREE.Object3D;
+  private foreL: THREE.Object3D;
+  private foreR: THREE.Object3D;
+  private footL: THREE.Object3D;
+  private footR: THREE.Object3D;
 
   private chest: THREE.Object3D;
   private head: THREE.Object3D;
@@ -37,222 +41,38 @@ export class Player {
   private runAmount = 0;
   private bobPhase = 0;
 
-  constructor(
-    palette: {
-      skin?: number;
-      shirt?: number;
-      trousers?: number;
-      shoes?: number;
-      hair?: number;
-    } = {}
-  ) {
-    const skin = new THREE.MeshStandardMaterial({
-      color: palette.skin ?? 0xc08a68,
-      roughness: 0.62,
-      metalness: 0.02,
-    });
-    const shirt = new THREE.MeshStandardMaterial({
-      color: palette.shirt ?? 0x2f4a63,
-      roughness: 0.72,
-      metalness: 0.04,
-      // subtle sheen so the fabric is not flat
-      envMapIntensity: 0.5,
-    });
-    const trousers = new THREE.MeshStandardMaterial({
-      color: palette.trousers ?? 0x2a3340,
-      roughness: 0.85,
-    });
-    const shoes = new THREE.MeshStandardMaterial({
-      color: palette.shoes ?? 0x1a1c1f,
-      roughness: 0.55,
-      metalness: 0.15,
-    });
-    const hair = new THREE.MeshStandardMaterial({
-      color: palette.hair ?? 0x2b2119,
-      roughness: 0.92,
-      flatShading: true,
-    });
-    const eye = new THREE.MeshStandardMaterial({ color: 0x1b1b1f, roughness: 0.25 });
+  constructor(palette: Record<string, number> = {}, height = 1.78) {
+    this.height = height;
+    this.palette = palette;
 
-    // ------------------------------------------------------------ torso
-    // pelvis
-    const pelvis = new THREE.Mesh(new THREE.CapsuleGeometry(0.155, 0.1, 4, 10), trousers);
-    pelvis.scale.set(1.15, 1, 0.78);
-    pelvis.position.y = 0.92;
-    this.model.add(pelvis);
+    const rig = createCharacter(this.height, palette);
+    this.model.add(rig.model);
+    this.model = rig.model;
 
-    const hipBone = new THREE.Object3D();
-    hipBone.position.y = 0.95;
-    this.model.add(hipBone);
-    this.hipBone = hipBone;
+    this.chest = rig.chest;
+    this.head = rig.head;
+    this.hipBone = rig.hipBone;
+    this.thighL = rig.thighL;
+    this.thighR = rig.thighR;
+    this.shinL = rig.shinL;
+    this.shinR = rig.shinR;
+    this.armL = rig.armL;
+    this.armR = rig.armR;
+    this.foreL = rig.foreL;
+    this.foreR = rig.foreR;
+    this.footL = rig.footL;
+    this.footR = rig.footR;
 
-    // chest: tapered capsule, wider at the shoulders
-    const chestGeo = new THREE.CapsuleGeometry(0.19, 0.22, 5, 12);
-    const chest = new THREE.Mesh(chestGeo, shirt);
-    chest.scale.set(1.12, 1, 0.72);
-    chest.position.y = 1.3;
-    this.model.add(chest);
-    this.chest = chest;
+      // shadows for everything at once
+      this.model.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.isMesh) {
+          m.castShadow = true;
+          m.receiveShadow = true;
+        }
+      });
 
-    // shoulder caps to hide the arm joints
-    for (const side of [-1, 1]) {
-      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.088, 10, 8), shirt);
-      cap.position.set(side * 0.185, 1.43, 0);
-      cap.scale.set(1, 0.9, 0.9);
-      this.model.add(cap);
-    }
-
-    // collar
-    const collar = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.075, 0.095, 0.06, 12),
-      new THREE.MeshStandardMaterial({ color: 0xe8e6e0, roughness: 0.8 })
-    );
-    collar.position.y = 1.47;
-    this.model.add(collar);
-
-    // ------------------------------------------------------------- neck
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.062, 0.08, 10), skin);
-    neck.position.y = 1.5;
-    this.model.add(neck);
-
-    // ------------------------------------------------------------- head
-    const headGroup = new THREE.Object3D();
-    headGroup.position.y = 1.56;
-    this.model.add(headGroup);
-    this.head = headGroup;
-
-    const skull = new THREE.Mesh(new THREE.SphereGeometry(0.108, 18, 16), skin);
-    skull.scale.set(0.92, 1.06, 0.95);
-    skull.position.y = 0.075;
-    headGroup.add(skull);
-
-    // jaw / chin
-    const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.082, 14, 12), skin);
-    jaw.scale.set(0.86, 0.72, 0.9);
-    jaw.position.set(0, 0.022, 0.014);
-    headGroup.add(jaw);
-
-    // nose
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.019, 0.05, 6), skin);
-    nose.rotation.x = Math.PI / 2.05;
-    nose.position.set(0, 0.062, 0.1);
-    headGroup.add(nose);
-
-    // ears
-    for (const side of [-1, 1]) {
-      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 8), skin);
-      ear.scale.set(0.5, 1, 0.8);
-      ear.position.set(side * 0.098, 0.07, -0.005);
-      headGroup.add(ear);
-    }
-
-    // eyes
-    for (const side of [-1, 1]) {
-      const e = new THREE.Mesh(new THREE.SphereGeometry(0.014, 8, 8), eye);
-      e.position.set(side * 0.036, 0.082, 0.088);
-      headGroup.add(e);
-    }
-
-    // hair: a cap plus a small swept fringe
-    const hairCap = new THREE.Mesh(
-      new THREE.SphereGeometry(0.113, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.66),
-      hair
-    );
-    hairCap.position.y = 0.08;
-    hairCap.scale.set(0.95, 1.05, 0.98);
-    headGroup.add(hairCap);
-
-    const fringe = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.032, 0.05), hair);
-    fringe.position.set(0.012, 0.135, 0.075);
-    fringe.rotation.z = -0.16;
-    headGroup.add(fringe);
-
-    // ------------------------------------------------------------- legs
-    // thigh -> knee -> shin -> ankle -> shoe
-    const buildLeg = (side: 1 | -1) => {
-      const thighPivot = new THREE.Object3D();
-      thighPivot.position.set(side * 0.085, 0.95, 0);
-      const thigh = new THREE.Mesh(new THREE.CapsuleGeometry(0.072, 0.3, 4, 10), trousers);
-      thigh.position.y = -0.21;
-      thigh.scale.set(1, 1, 0.92);
-      thighPivot.add(thigh);
-
-      const shinPivot = new THREE.Object3D();
-      shinPivot.position.y = -0.45;
-      const shin = new THREE.Mesh(new THREE.CapsuleGeometry(0.058, 0.32, 4, 10), trousers);
-      shin.position.y = -0.19;
-      shin.scale.set(1, 1, 0.95);
-      shinPivot.add(shin);
-
-      // ankle + shoe (sole slightly wider, toe box forward)
-      // ankle sits at the end of the shin, the sole rests exactly on y = 0
-      // hip 0.95 = thigh 0.44 + shin 0.45 + shoe 0.06, so the sole sits on y = 0
-      const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.078, 0.26), shoes);
-      shoe.position.set(0, -0.458, 0.05);
-      shinPivot.add(shoe);
-      const sole = new THREE.Mesh(new THREE.BoxGeometry(0.106, 0.018, 0.27), shoes);
-      sole.position.set(0, -0.494, 0.05);
-      shinPivot.add(sole);
-
-      this.model.add(thighPivot);
-      thighPivot.add(shinPivot);
-      return { thighPivot, shinPivot };
-    };
-
-    const left = buildLeg(-1);
-    const right = buildLeg(1);
-    this.thighL = left.thighPivot;
-    this.shinL = left.shinPivot;
-    this.thighR = right.thighPivot;
-    this.shinR = right.shinPivot;
-
-    // ------------------------------------------------------------- arms
-    const buildArm = (side: 1 | -1) => {
-      const armPivot = new THREE.Object3D();
-      armPivot.position.set(side * 0.185, 1.41, 0);
-
-      const upper = new THREE.Mesh(new THREE.CapsuleGeometry(0.052, 0.2, 4, 10), shirt);
-      upper.position.y = -0.12;
-      armPivot.add(upper);
-
-      const forePivot = new THREE.Object3D();
-      forePivot.position.y = -0.26;
-      const fore = new THREE.Mesh(new THREE.CapsuleGeometry(0.044, 0.19, 4, 10), shirt);
-      fore.position.y = -0.11;
-      forePivot.add(fore);
-
-      // hand
-      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.048, 10, 8), skin);
-      hand.scale.set(0.85, 1.15, 0.6);
-      hand.position.y = -0.235;
-      forePivot.add(hand);
-
-      armPivot.add(forePivot);
-      this.model.add(armPivot);
-      return { armPivot, forePivot };
-    };
-
-    const armLeft = buildArm(-1);
-    const armRight = buildArm(1);
-    this.armL = armLeft.armPivot;
-    this.foreL = armLeft.forePivot;
-    this.armR = armRight.armPivot;
-    this.foreR = armRight.forePivot;
-
-    // a slight rest pose: arms hang a little away from the body
-    this.armL.rotation.z = 0.08;
-    this.armR.rotation.z = -0.08;
-
-    // shadows for everything at once
-    this.model.traverse((o) => {
-      const m = o as THREE.Mesh;
-      if (m.isMesh) {
-        m.castShadow = true;
-        m.receiveShadow = true;
-      }
-    });
-
-    this.group.add(this.model);
+      this.group.add(this.model);
   }
 
   place(x: number, z: number, heading = 0) {
@@ -376,6 +196,10 @@ export class Player {
       this.model.position.y = Math.abs(Math.sin(this.bobPhase)) * (0.02 + this.runAmount * 0.035);
 
       // head stabilises against the body bob
+      // ankles: the toe points down as the leg pushes off (heel–toe roll)
+      this.footL.rotation.x = -Math.max(0, Math.sin(this.walkPhase - 0.9)) * 0.5 * (0.6 + this.runAmount);
+      this.footR.rotation.x = -Math.max(0, Math.sin(this.walkPhase + Math.PI - 0.9)) * 0.5 * (0.6 + this.runAmount);
+
       this.head.rotation.x = -0.4 * this.model.rotation.x;
       this.head.rotation.z = s * 0.03 * (1 - this.runAmount);
     } else {
@@ -397,6 +221,8 @@ export class Player {
       this.model.rotation.x = THREE.MathUtils.lerp(this.model.rotation.x, 0, relax);
       this.model.position.y = THREE.MathUtils.lerp(this.model.position.y, 0, relax);
       this.head.rotation.x = THREE.MathUtils.lerp(this.head.rotation.x, 0, relax);
+      this.footL.rotation.x = THREE.MathUtils.lerp(this.footL.rotation.x, 0, relax);
+      this.footR.rotation.x = THREE.MathUtils.lerp(this.footR.rotation.x, 0, relax);
 
       // look around slightly when standing still
       this.head.rotation.y = Math.sin(performance.now() * 0.00035) * 0.22;

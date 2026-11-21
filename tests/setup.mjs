@@ -20,6 +20,8 @@ execFileSync(
     "src/ui/settings.ts",
     "src/game/movement.ts",
     "src/player.ts",
+    "src/character/model.ts",
+    "src/world/build/geom.ts",
     "node_modules/@types/three/index.d.ts",
     "--outDir",
     out,
@@ -53,7 +55,7 @@ for (const file of files) {
   }
 }
 
-rmSync(out, { recursive: true, force: true });
+if (process.env.KEEP_TEST_BUILD !== "1") rmSync(out, { recursive: true, force: true });
 if (failed) {
   console.error(`\n${failed} test file(s) failed`);
   process.exit(1);
