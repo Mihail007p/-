@@ -1,6 +1,8 @@
 /**
- * Keyboard + mouse + touch input. Touch is first-class: the game is meant for
- * phones, so a virtual stick and a look area are built into the page.
+ * Keyboard + mouse + touch input.
+ *
+ * Look input is buffered in device pixels and normalised later, so a mouse and
+ * a finger at the same physical speed produce the same rotation.
  */
 export class Input {
   private keys = new Set<string>();
@@ -8,73 +10,80 @@ export class Input {
 
   /** virtual stick vector (-1..1) */
   stick = { x: 0, y: 0 };
-  /** camera look delta accumulated this frame (pixels) */
+  /** accumulated look delta for this frame, in CSS pixels */
   lookX = 0;
   lookY = 0;
-  /** touch look is active (finger on the right half) */
-  looking = false;
-
   zoomDelta = 0;
+  /** raw counter of touch taps for double-tap recentre */
+  private lastTapTime = 0;
+  private tapCount = 0;
+  recenterRequested = false;
+  pointerLocked = false;
 
   constructor(canvas: HTMLCanvasElement) {
     window.addEventListener("keydown", (e) => {
       if (!this.keys.has(e.code)) this.pressedOnce.add(e.code);
       this.keys.add(e.code);
-      if (
-        ["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Tab"].includes(e.code)
-      ) {
+      if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Tab"].includes(e.code)) {
         e.preventDefault();
       }
     });
     window.addEventListener("keyup", (e) => this.keys.delete(e.code));
     window.addEventListener("blur", () => this.keys.clear());
 
-    // mouse look: drag on the canvas
-    let dragging = false;
+    // ---------------------------------------------------------- mouse look
     let lastX = 0;
     let lastY = 0;
     canvas.addEventListener("mousedown", (e) => {
-      dragging = true;
       lastX = e.clientX;
       lastY = e.clientY;
+      if (document.pointerLockElement !== canvas) {
+        // pointer lock is the comfortable way to look around on desktop;
+        // dragging still works as a fallback if the browser refuses
+        canvas.requestPointerLock?.();
+      }
     });
-    window.addEventListener("mouseup", () => (dragging = false));
+    document.addEventListener("pointerlockchange", () => {
+      this.pointerLocked = document.pointerLockElement === canvas;
+    });
     window.addEventListener("mousemove", (e) => {
-      if (!dragging) return;
-      this.lookX += e.clientX - lastX;
-      this.lookY += e.clientY - lastY;
-      lastX = e.clientX;
-      lastY = e.clientY;
+      if (this.pointerLocked) {
+        this.lookX += e.movementX;
+        this.lookY += e.movementY;
+      } else if (e.buttons & 1) {
+        this.lookX += e.clientX - lastX;
+        this.lookY += e.clientY - lastY;
+        lastX = e.clientX;
+        lastY = e.clientY;
+      }
     });
     canvas.addEventListener(
       "wheel",
       (e) => {
-        this.zoomDelta += e.deltaY * 0.01;
+        // one notch = one small step, independent of the wheel's raw delta
+        this.zoomDelta += Math.sign(e.deltaY) * 0.55;
         e.preventDefault();
       },
       { passive: false }
     );
+    // keep touch from scrolling/zooming the page
+    canvas.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
 
-    this.bindTouchStick();
-    this.bindTouchLook();
+    this.bindStick();
+    this.bindLookZone();
+    this.bindRunButton();
   }
 
-  private bindTouchStick() {
+  // ------------------------------------------------------------ virtual stick
+  private bindStick() {
     const stickEl = document.getElementById("stick")!;
     const knob = document.getElementById("stick-knob")!;
     let active: number | null = null;
     let cx = 0;
     let cy = 0;
+    const max = 46;
 
-    const start = (t: Touch) => {
-      active = t.identifier;
-      const r = stickEl.getBoundingClientRect();
-      cx = r.left + r.width / 2;
-      cy = r.top + r.height / 2;
-      move(t);
-    };
     const move = (t: Touch) => {
-      const max = 46;
       let dx = t.clientX - cx;
       let dy = t.clientY - cy;
       const len = Math.hypot(dx, dy);
@@ -83,66 +92,142 @@ export class Input {
         dy = (dy / len) * max;
       }
       knob.style.transform = `translate(${dx}px, ${dy}px)`;
-      this.stick.x = dx / max;
-      this.stick.y = dy / max;
+      // small dead zone in the centre so the character doesn't creep
+      const nx = dx / max;
+      const ny = dy / max;
+      const mag = Math.hypot(nx, ny);
+      const dz = 0.16;
+      if (mag < dz) {
+        this.stick.x = 0;
+        this.stick.y = 0;
+      } else {
+        const scaled = (mag - dz) / (1 - dz);
+        this.stick.x = (nx / mag) * scaled;
+        this.stick.y = (ny / mag) * scaled;
+      }
     };
-    const end = () => {
+
+    const reset = () => {
       active = null;
       knob.style.transform = "translate(0px, 0px)";
       this.stick.x = 0;
       this.stick.y = 0;
     };
 
-    stickEl.addEventListener("touchstart", (e) => {
-      const t = e.changedTouches[0];
-      start(t);
-      e.preventDefault();
-    });
-    stickEl.addEventListener("touchmove", (e) => {
-      for (const t of Array.from(e.changedTouches)) {
-        if (t.identifier === active) move(t);
-      }
-      e.preventDefault();
-    });
+    stickEl.addEventListener(
+      "touchstart",
+      (e) => {
+        const t = e.changedTouches[0];
+        active = t.identifier;
+        const r = stickEl.getBoundingClientRect();
+        cx = r.left + r.width / 2;
+        cy = r.top + r.height / 2;
+        move(t);
+        e.preventDefault();
+      },
+      { passive: false }
+    );
+    stickEl.addEventListener(
+      "touchmove",
+      (e) => {
+        for (const t of Array.from(e.changedTouches)) {
+          if (t.identifier === active) move(t);
+        }
+        e.preventDefault();
+      },
+      { passive: false }
+    );
     const stop = (e: TouchEvent) => {
       for (const t of Array.from(e.changedTouches)) {
-        if (t.identifier === active) end();
+        if (t.identifier === active) reset();
       }
     };
     stickEl.addEventListener("touchend", stop);
     stickEl.addEventListener("touchcancel", stop);
   }
 
-  private bindTouchLook() {
-    const lookEl = document.getElementById("look-zone")!;
+  // ------------------------------------------------------------ look on touch
+  private bindLookZone() {
+    const zone = document.getElementById("look-zone")!;
     let active: number | null = null;
     let lastX = 0;
     let lastY = 0;
+    let moved = 0;
+    let startTime = 0;
 
-    lookEl.addEventListener("touchstart", (e) => {
-      const t = e.changedTouches[0];
-      active = t.identifier;
-      lastX = t.clientX;
-      lastY = t.clientY;
-      this.looking = true;
-    });
-    lookEl.addEventListener("touchmove", (e) => {
-      for (const t of Array.from(e.changedTouches)) {
-        if (t.identifier !== active) continue;
-        this.lookX += t.clientX - lastX;
-        this.lookY += t.clientY - lastY;
+    const end = () => {
+      // a quick tap without movement = potential double-tap recentre
+      if (moved < 12 && performance.now() - startTime < 220) {
+        const now = performance.now();
+        if (now - this.lastTapTime < 320) {
+          this.tapCount++;
+          this.recenterRequested = true;
+        } else {
+          this.tapCount = 0;
+        }
+        this.lastTapTime = now;
+      }
+      active = null;
+      moved = 0;
+    };
+
+    zone.addEventListener(
+      "touchstart",
+      (e) => {
+        const t = e.changedTouches[0];
+        active = t.identifier;
         lastX = t.clientX;
         lastY = t.clientY;
-      }
-      e.preventDefault();
-    });
-    const stop = () => {
-      active = null;
-      this.looking = false;
-    };
-    lookEl.addEventListener("touchend", stop);
-    lookEl.addEventListener("touchcancel", stop);
+        moved = 0;
+        startTime = performance.now();
+      },
+      { passive: true }
+    );
+    zone.addEventListener(
+      "touchmove",
+      (e) => {
+        for (const t of Array.from(e.changedTouches)) {
+          if (t.identifier !== active) continue;
+          const dx = t.clientX - lastX;
+          const dy = t.clientY - lastY;
+          moved += Math.abs(dx) + Math.abs(dy);
+          this.lookX += dx;
+          this.lookY += dy;
+          lastX = t.clientX;
+          lastY = t.clientY;
+        }
+        e.preventDefault();
+      },
+      { passive: false }
+    );
+    zone.addEventListener("touchend", () => end());
+    zone.addEventListener("touchcancel", () => end());
+
+    // desktop: double click also recentres
+    zone.addEventListener("dblclick", () => (this.recenterRequested = true));
   }
+
+  private bindRunButton() {
+    const btn = document.getElementById("run-btn")!;
+    let pressed = false;
+    btn.addEventListener("touchstart", () => {
+      pressed = true;
+      btn.classList.add("active");
+    });
+    const up = () => {
+      pressed = false;
+      btn.classList.remove("active");
+    };
+    btn.addEventListener("touchend", up);
+    btn.addEventListener("touchcancel", up);
+    btn.addEventListener("click", () => {
+      pressed = !pressed;
+      btn.classList.toggle("active", pressed);
+    });
+    this.isRunHeld = () => pressed;
+  }
+
+  isRunHeld: () => boolean = () => false;
 
   down(code: string) {
     return this.keys.has(code);
@@ -180,6 +265,9 @@ export class Input {
   }
 
   get sprint() {
-    return this.down("ShiftLeft") || this.down("ShiftRight");
+    if (this.isRunHeld()) return true;
+    if (this.down("ShiftLeft") || this.down("ShiftRight")) return true;
+    // pushing the stick all the way also runs
+    return Math.hypot(this.stick.x, this.stick.y) > 0.94;
   }
 }

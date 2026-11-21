@@ -344,9 +344,138 @@ body {
   }
 }
 
-/* hide the touch UI where it would only get in the way */
-@media (pointer: fine) and (min-width: 900px) {
-  .look-zone {
-    display: none;
+/* the touch widgets only exist on touch devices */
+body:not(.touch) .look-zone,
+body:not(.touch) .stick,
+body:not(.touch) .run-btn {
+  display: none !important;
+}
+
+/* --------------------------------------------------------- settings panel */
+.settings-btn {
+  position: absolute;
+  left: max(14px, env(safe-area-inset-left));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  color: #eaf2f8;
+  font-size: 19px;
+  line-height: 1;
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.settings-panel {
+  position: absolute;
+  left: max(14px, env(safe-area-inset-left));
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 54px);
+  width: min(300px, calc(100vw - 28px));
+  padding: 14px 16px 12px;
+  border-radius: 14px;
+  background: rgba(9, 15, 21, 0.86);
+  border: 1px solid var(--stroke);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+  pointer-events: none;
+  transition: opacity 0.18s, transform 0.18s;
+}
+
+.settings-panel.open {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+
+.settings-close {
+  border: 0;
+  background: transparent;
+  color: #9fb3c2;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #c2d3e0;
+  margin: 8px 0 4px;
+}
+
+.row output {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.row.check {
+  justify-content: flex-start;
+  gap: 9px;
+  margin: 10px 0;
+}
+
+.row.check input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--accent);
+}
+
+#sens {
+  width: 100%;
+  accent-color: var(--accent);
+  margin: 2px 0 6px;
+}
+
+.settings-reset {
+  width: 100%;
+  margin-top: 6px;
+  padding: 9px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #dbe7f0;
+  font: 600 12px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.settings-tip {
+  margin: 9px 0 0;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: #7e91a2;
+}
+
+.settings-tip b {
+  color: #cfe0ec;
+}
+
+/* the stick sits above the settings button on phones */
+@media (pointer: coarse) {
+  .settings-btn {
+    left: auto;
+    right: max(16px, env(safe-area-inset-right));
+    bottom: auto;
+    top: calc(max(14px, env(safe-area-inset-top)) + 178px);
+  }
+  .settings-panel {
+    left: auto;
+    right: max(14px, env(safe-area-inset-right));
+    bottom: auto;
+    top: calc(max(14px, env(safe-area-inset-top)) + 230px);
   }
 }

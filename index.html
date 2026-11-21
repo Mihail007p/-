@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content"
     />
     <meta name="theme-color" content="#8fb6d6" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -24,7 +24,33 @@
         <div class="compass"><span id="compass">С</span></div>
       </div>
       <div id="place" class="place">Центральный проспект</div>
-      <div id="stats" class="stats hidden"></div>
+      <button id="settings-btn" class="settings-btn" aria-label="Настройки камеры">⚙</button>
+
+      <div id="settings-panel" class="settings-panel">
+        <div class="settings-head">
+          <b>Камера</b>
+          <button id="settings-close" class="settings-close" aria-label="Закрыть">✕</button>
+        </div>
+
+        <label class="row">
+          <span>Чувствительность</span>
+          <output id="sens-value">1.00×</output>
+        </label>
+        <input id="sens" type="range" min="0.3" max="2.4" step="0.05" value="1" />
+
+        <label class="row check">
+          <input id="invert-y" type="checkbox" />
+          <span>Инвертировать обзор по вертикали</span>
+        </label>
+
+        <label class="row check">
+          <input id="auto-center" type="checkbox" checked />
+          <span>Авто-возврат камеры за спину</span>
+        </label>
+
+        <button id="settings-reset" class="settings-reset">Сбросить</button>
+        <p class="settings-tip">Двойной тап по экрану или клавиша <b>C</b> — вернуть камеру за спину.</p>
+      </div>
     </div>
 
     <!-- touch controls -->
@@ -55,8 +81,8 @@
         <div class="controls">
           <div><b>W A S D</b><span>идти</span></div>
           <div><b>Shift</b><span>бежать</span></div>
-          <div><b>Мышь</b><span>камера</span></div>
-          <div><b>Колесо</b><span>приближение</span></div>
+          <div><b>Мышь</b><span>камера (плавно)</span></div>
+          <div><b>C / двойной тап</b><span>камера за спину</span></div>
         </div>
 
         <button id="start" class="start">Пойти в город</button>
