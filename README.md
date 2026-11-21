@@ -44,10 +44,22 @@
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
-npm run typecheck  # tsc --noEmit
-npm run build      # → docs/index.html (один файл); копия кладётся в NeonDistrict.html
+npm run dev         # http://localhost:5173
+npm run typecheck   # tsc --noEmit
+npm run test:camera # тесты камеры (jsdom, 12 проверок)
+npm run build       # → docs/index.html (один файл); копия кладётся в NeonDistrict.html
 ```
+
+### Камера: как проверяется
+
+`npm run test:camera` компилирует `src/camera.ts` и `src/input.ts`, поднимает jsdom
+и прогоняет реальные события мыши и касаний. Проверяется, в частности:
+
+- после отпускания мыши/пальца камера **не двигается вообще** (drift = 0.000°);
+- поворот 1:1 с движением руки в обычном темпе и сжатие при резком флике;
+- отсутствие дрейфа при нулевом вводе (3 с);
+- авто-возврат за спину только при ходьбе и после 2.4 с без вмешательства;
+- одинаковый результат на 30 и 60 FPS.
 
 Структура:
 

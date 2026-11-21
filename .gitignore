@@ -5,3 +5,4 @@ NeonDistrict.html
 *.local
 *.log
 .DS_Store
+.test-build/
